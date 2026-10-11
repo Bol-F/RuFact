@@ -1,22 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-type Locale = "uz" | "ru" | "en";
-
-async function changeLanguage(page: Page, locale: Locale) {
-  const menu = page.locator('header button[aria-controls="mobile-navigation"]');
-  if (await menu.isVisible()) {
-    if (await menu.getAttribute("aria-expanded") !== "true") await menu.click();
-    await page.locator("#mobile-navigation select").selectOption(locale);
-    await expect(page.locator("html")).toHaveAttribute("data-locale", locale);
-    if (await menu.getAttribute("aria-expanded") === "true") await menu.click();
-    await expect(page.locator("#mobile-navigation")).not.toBeVisible();
-  } else {
-    await page.locator("header select:visible").selectOption(locale);
-    await expect(page.locator("html")).toHaveAttribute("data-locale", locale);
-  }
-}
+import { changeLanguage } from "./helpers/language";
 
 async function navigateFromHeader(page: Page, href: string) {
   const menu = page.locator('header button[aria-controls="mobile-navigation"]');

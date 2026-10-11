@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { changeLanguage } from "./helpers/language";
 
 test("localized chat works on phone and desktop with follow-ups and clearing", async ({ page }, testInfo) => {
   const errors: string[] = [];
@@ -31,9 +32,7 @@ test("localized chat works on phone and desktop with follow-ups and clearing", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Yangi suhbat", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Nimani aniqlamoqchisiz?" })).toBeVisible();
-  if (testInfo.project.name.startsWith("mobile")) await page.getByRole("button", { name: "Menyuni ochish" }).click();
-  await page.getByRole("combobox", { name: "Tilni tanlash" }).selectOption("en");
-  if (testInfo.project.name.startsWith("mobile")) await page.getByRole("button", { name: "Close menu" }).click();
+  await changeLanguage(page, "en");
   await expect(page.getByRole("heading", { name: "Let’s make sense of it." })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Question for AI chat" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -96,7 +95,7 @@ test("API rejects cross-origin, invalid roles and oversized payloads", async ({ 
   expect((await intro.json()).sources).toEqual([]);
 });
 
-test("conversation survives refresh and language changes until explicitly ended", async ({ page }, testInfo) => {
+test("conversation survives refresh and language changes until explicitly ended", async ({ page }) => {
   const requests: { messages: { role: string; content: string }[]; locale: string }[] = [];
   await page.route("**/api/chat", async route => {
     requests.push(route.request().postDataJSON());
@@ -109,9 +108,7 @@ test("conversation survives refresh and language changes until explicitly ended"
   await expect(page.getByText("Topilgan manbalar")).toHaveCount(0);
   await page.reload();
   await expect(page.getByText("Saved answer.", { exact: true })).toBeVisible();
-  if (testInfo.project.name.startsWith("mobile")) await page.getByRole("button", { name: "Menyuni ochish" }).click();
-  await page.getByRole("combobox", { name: "Tilni tanlash" }).selectOption("en");
-  if (testInfo.project.name.startsWith("mobile")) await page.getByRole("button", { name: "Close menu" }).click();
+  await changeLanguage(page, "en");
   await expect(page.getByText("Saved answer.", { exact: true })).toBeVisible();
   const input = page.getByRole("textbox", { name: "Question for AI chat" });
   await input.fill("Follow-up");
