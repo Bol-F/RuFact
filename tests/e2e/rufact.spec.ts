@@ -1,11 +1,11 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { changeLanguage } from "./helpers/language";
+import { analysisFixture } from "./helpers/analysis";
 
 async function selectRussian(page: import("@playwright/test").Page) {
-  await page.evaluate(() => window.localStorage.setItem("rufact.locale.v1", "ru"));
-  await page.reload();
-  await expect(page.locator('select[aria-label="Выбрать язык"]').first()).toHaveValue("ru");
+  await changeLanguage(page, "ru");
 }
 
 test("hero artwork loads from the public asset", async ({ page }, testInfo) => {
@@ -134,6 +134,7 @@ test("extracts an uploaded text document into the analyzer", async ({ page }) =>
 });
 
 test("desktop analysis workflow and guidance", async ({ page }, testInfo) => {
+  await page.route("**/api/analyze", route => route.fulfill({ json: analysisFixture() }));
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -178,6 +179,7 @@ test("desktop analysis workflow and guidance", async ({ page }, testInfo) => {
 
 test("result actions and feedback dialog work", async ({ page, context }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop"), "Desktop-only check");
+  await page.route("**/api/analyze", route => route.fulfill({ json: analysisFixture() }));
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "share", {
@@ -188,7 +190,10 @@ test("result actions and feedback dialog work", async ({ page, context }, testIn
 
   await page.goto("/");
   await selectRussian(page);
+  await page.getByRole("button", { name: "Новость", exact: true }).click();
+  await page.locator(".analyzer-submit").click();
   const actions = page.getByRole("region", { name: "Действия с результатом" });
+  await expect(actions).toBeVisible();
 
   await actions.getByRole("button", { name: "Копировать отчёт" }).click();
   await expect(actions.getByRole("status")).toContainText("Отчёт скопирован");
@@ -310,6 +315,7 @@ test("optional live Gemini review renders validated claims", async ({ page }, te
   const geminiSwitch = page.getByRole("switch", { name: /Проверка по интернет-источникам/u });
   await expect(geminiSwitch).toBeEnabled();
   await geminiSwitch.check();
+  await page.getByRole("button", { name: "Новость", exact: true }).click();
   await page.getByRole("button", { name: /Проверить текст/u }).click();
 
   await expect(
@@ -333,28 +339,16 @@ test("switches the full interface language and remembers the choice", async ({ p
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Matnni");
-  await page.locator('select[aria-label="Tilni tanlash"]').first().evaluate(
-    (select) => {
-      const element = select as HTMLSelectElement;
-      element.value = "en";
-      element.dispatchEvent(new Event("change", { bubbles: true }));
-    },
-  );
+  await changeLanguage(page, "en");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Check a text");
-  await expect(page.getByLabel("Text to analyse")).toHaveValue(/Scientists have proven/u);
+  await expect(page.getByLabel("Text to analyse")).toHaveValue("");
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Check a text");
   const draft = "This user draft must stay when the design changes.";
   await page.getByLabel("Text to analyse").fill(draft);
 
-  await page.locator('select[aria-label="Choose language"]').first().evaluate(
-    (select) => {
-      const element = select as HTMLSelectElement;
-      element.value = "ru";
-      element.dispatchEvent(new Event("change", { bubbles: true }));
-    },
-  );
+  await changeLanguage(page, "ru");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Проверьте текст");
   await expect(page.getByLabel("Текст для анализа")).toHaveValue(draft);
 });

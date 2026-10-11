@@ -23,7 +23,7 @@ interface AnalyzerWorkspaceSessionProps extends AnalyzerWorkspaceProps {
 
 function formatTimestamp(date: Date, locale: "uz" | "ru" | "en") {
   // Browser ICU builds can format uz-Latn-UZ differently from Node (e.g. "M11").
-  // Use stable Uzbek month names, including for the server-rendered demo.
+  // Use stable Uzbek month names for submitted and restored results.
   if (locale === "uz") {
     const months = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
     const hours = String(date.getHours()).padStart(2, "0");
@@ -59,28 +59,13 @@ function AnalyzerWorkspaceSession({
 }: AnalyzerWorkspaceSessionProps) {
   const history = useAnalysisHistory();
   const examples = copy.examples as readonly TextExample[];
-  const initialExample = examples.find((example) => example.id === "medical") ?? examples[0];
-  const initialResult: AnalysisResponse = locale === "ru"
-    ? getMockAnalysis(initialExample.text)
-    : {
-        label: "FAKE",
-        confidence: 0.55,
-        explanation: copy.result.fake,
-        meta: {
-          engine: "demo-heuristic",
-          engineVersion: "multilingual-preview-v1",
-          externalSourcesChecked: false,
-        },
-      };
-  // An untouched example follows the UI language; user-entered or uploaded text never resets.
-  const [text, setText] = useState<string | null>(null);
-  const inputText = text ?? initialExample.text;
-  const [activeExampleId, setActiveExampleId] = useState<string | null>("medical");
+  const [text, setText] = useState("");
+  const [activeExampleId, setActiveExampleId] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [analyzedText, setAnalyzedText] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>("initial");
-  const [analyzedAt, setAnalyzedAt] = useState(() => new Date("2024-11-26T14:37:00"));
-  const timestamp = formatTimestamp(analyzedAt, locale);
+  const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
+  const timestamp = analyzedAt ? formatTimestamp(analyzedAt, locale) : "";
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -90,6 +75,7 @@ function AnalyzerWorkspaceSession({
     kind: "success" | "warning" | "error";
     text: string;
   } | null>(null);
+  const isBusy = status === "loading" || isExtracting;
 
   const handleTextChange = (value: string) => {
     setText(value);
@@ -101,10 +87,16 @@ function AnalyzerWorkspaceSession({
   };
 
   const handleClear = () => {
+    if (isBusy) return;
     setText("");
     setActiveExampleId(null);
     setValidationMessage(null);
     setDocumentMessage(null);
+    setResult(null);
+    setAnalyzedText(null);
+    setAnalyzedAt(null);
+    setStatus("initial");
+    setErrorMessage(null);
   };
 
   const handleExampleSelect = (example: TextExample) => {
@@ -148,7 +140,7 @@ function AnalyzerWorkspaceSession({
   };
 
   const handleSubmit = async () => {
-    const normalizedText = inputText.trim();
+    const normalizedText = text.trim();
 
     if (!normalizedText) {
       setValidationMessage(copy.analyzer.required);
@@ -158,7 +150,6 @@ function AnalyzerWorkspaceSession({
 
     setValidationMessage(null);
     setErrorMessage(null);
-    // Once checking begins, the submitted sample is a draft too; don't swap it mid-request.
     setText(normalizedText);
     setStatus("loading");
 
@@ -191,6 +182,7 @@ function AnalyzerWorkspaceSession({
   };
 
   const handleHistoryRestore = (item: HistoryItem) => {
+    if (isBusy) return;
     const restoredResult: AnalysisResponse =
       item.meta.engine === "demo-heuristic"
         ? getMockAnalysis(item.text)
@@ -223,7 +215,8 @@ function AnalyzerWorkspaceSession({
     >
       <div className="analyzer-grid grid items-start gap-3 sm:gap-[18px] lg:grid-cols-[minmax(0,1.25fr)_minmax(390px,0.95fr)]">
         <TextAnalyzer
-          text={inputText}
+          text={text}
+          canClear={text.length > 0 || result !== null || status === "error"}
           examples={examples}
           activeExampleId={activeExampleId}
           isLoading={status === "loading"}
@@ -240,14 +233,14 @@ function AnalyzerWorkspaceSession({
           onClear={handleClear}
           onExampleSelect={handleExampleSelect}
           onSubmit={handleSubmit}
-          onOpenHistory={() => setIsHistoryOpen(true)}
+          onOpenHistory={() => { if (!isBusy) setIsHistoryOpen(true); }}
           onUseGeminiChange={setUseGemini}
         />
 
         <div className="analyzer-result-slot min-w-0">
           <AnalysisResult
-            result={result ?? initialResult}
-            analyzedText={analyzedText ?? initialExample.text}
+            result={result}
+            analyzedText={analyzedText ?? ""}
             status={status}
             timestamp={timestamp}
             errorMessage={errorMessage}

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { changeLanguage } from "./helpers/language";
+import { analysisFixture } from "./helpers/analysis";
 
 async function navigateFromHeader(page: Page, href: string) {
   const menu = page.locator('header button[aria-controls="mobile-navigation"]');
@@ -117,6 +118,7 @@ test("all languages share the Russian geometry and typography with restored regi
 });
 
 test("Uzbek teal and English navy-copper colors apply to the shared hero and controls", async ({ page }) => {
+  await page.route("**/api/analyze", route => route.fulfill({ json: analysisFixture("FAKE", 0.87) }));
   await page.goto("/");
   const palettes = {
     uz: { ink: "rgb(20, 61, 67)", accent: "rgb(8, 127, 131)", primary: "rgb(8, 127, 131)" },
@@ -150,6 +152,9 @@ test("Uzbek teal and English navy-copper colors apply to the shared hero and con
   await expect(page.locator("header .brand > span:first-child > span:last-child")).toHaveCSS("background-color", "rgb(226, 122, 66)");
   await expect(page.locator(".header-feedback")).toHaveCSS("background-color", "rgb(10, 41, 73)");
   await expect(page.locator(".analyzer-submit")).not.toHaveCSS("background-image", "none");
+  await page.getByRole("button", { name: "Новость", exact: true }).click();
+  await page.locator(".analyzer-submit").click();
+  await expect(page.locator('.analysis-result section[aria-label$=": FAKE"]')).toBeVisible();
   await expect(page.locator('.analysis-result section[aria-label$=": FAKE"] p').first()).toHaveCSS("color", "rgb(199, 53, 60)");
 });
 
@@ -311,7 +316,10 @@ test("enlarged text keeps narrow desktop verdicts and result headings readable",
     await expectPanelLayout(page, true);
     await expectNoOverflow(page);
   }
-  await expectReadableResult();
+  // A fresh page has no verdict or confidence meter to measure.
+  await expect(page.locator(".analysis-result.result-empty")).toBeVisible();
+  await expectPanelLayout(page, true);
+  await expectNoOverflow(page);
   await page.locator("#analysis-text").fill("Toshkent is the capital of Uzbekistan.");
   await page.locator(".analyzer-submit").click();
   await expect(page.locator('.analysis-result section[aria-label$=": REAL"]')).toBeVisible();

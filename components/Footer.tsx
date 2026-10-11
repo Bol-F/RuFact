@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Send } from "lucide-react";
+import { chatCopy } from "@/lib/chat-copy";
 import { REGIONAL_ARTWORK } from "@/lib/regional-artwork";
 
 import { Brand } from "./Brand";
@@ -24,6 +26,16 @@ export function Footer() {
           <p className="mt-2 text-[0.65625rem] leading-[1.5] text-[#b9c8d4]">
             {copy.footer.tagline}
           </p>
+          <a
+            href="https://t.me/RuFact_bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${chatCopy[locale].telegram}: @RuFact_bot`}
+            className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-[0.75rem] font-semibold text-white transition-colors hover:bg-white/20"
+          >
+            <Send size={15} aria-hidden="true" />
+            Telegram · @RuFact_bot
+          </a>
           {artwork ? (
             <p className="regional-artwork-credit mt-2 max-w-[420px] text-[0.65625rem] leading-[1.5] text-[#b9c8d4]">
               {artwork.credit}: <a className="focus-ring rounded underline underline-offset-2" href={artwork.source} target="_blank" rel="noopener noreferrer">{artwork.author}</a>

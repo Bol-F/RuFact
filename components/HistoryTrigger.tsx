@@ -7,6 +7,7 @@ export const HISTORY_DIALOG_ID = "analysis-history-dialog";
 export const HISTORY_TRIGGER_ID = "analysis-history-trigger";
 
 export interface HistoryTriggerProps {
+  disabled?: boolean;
   isOpen: boolean;
   enabled: boolean;
   itemCount: number;
@@ -17,6 +18,7 @@ export interface HistoryTriggerProps {
 }
 
 export function HistoryTrigger({
+  disabled = false,
   isOpen,
   enabled,
   itemCount,
@@ -39,12 +41,13 @@ export function HistoryTrigger({
     <button
       id={id}
       type="button"
+      disabled={disabled}
       aria-haspopup="dialog"
       aria-controls={dialogId}
       aria-expanded={isOpen}
       aria-label={`${labels.history}: ${statusLabel}${countLabel}`}
       onClick={onOpen}
-      className={`focus-ring relative inline-flex min-h-9 items-center gap-2 rounded-[10px] border border-[#d8d8d2] bg-[#fbfaf6]/90 px-1.5 text-[0.75rem] font-bold text-[#28445f] shadow-[0_6px_18px_rgba(31,48,63,0.06)] transition hover:-translate-y-0.5 hover:border-[#bdc8cf] hover:bg-white sm:min-h-10 sm:rounded-xl sm:px-3.5 ${className}`}
+      className={`focus-ring relative inline-flex min-h-9 items-center gap-2 rounded-[10px] border border-[#d8d8d2] bg-[#fbfaf6]/90 px-1.5 text-[0.75rem] font-bold text-[#28445f] shadow-[0_6px_18px_rgba(31,48,63,0.06)] transition hover:-translate-y-0.5 hover:border-[#bdc8cf] hover:bg-white disabled:cursor-wait disabled:opacity-50 disabled:hover:translate-y-0 sm:min-h-10 sm:rounded-xl sm:px-3.5 ${className}`}
     >
       <span className="relative grid h-6 w-6 place-items-center rounded-[7px] bg-[#e7edf2] text-[#315d7f] sm:h-7 sm:w-7 sm:rounded-lg">
         <History size={14} strokeWidth={2} aria-hidden="true" />

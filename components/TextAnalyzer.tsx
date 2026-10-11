@@ -16,6 +16,7 @@ import { useLanguage } from "./LanguageProvider";
 
 interface TextAnalyzerProps {
   text: string;
+  canClear: boolean;
   examples: readonly TextExample[];
   activeExampleId: string | null;
   isLoading: boolean;
@@ -40,6 +41,7 @@ const MAX_LENGTH = 5000;
 
 export function TextAnalyzer({
   text,
+  canClear,
   examples,
   activeExampleId,
   isLoading,
@@ -77,6 +79,7 @@ export function TextAnalyzer({
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <HistoryTrigger
+            disabled={isBusy}
             isOpen={historyOpen}
             enabled={historyEnabled}
             itemCount={historyCount}
@@ -85,7 +88,7 @@ export function TextAnalyzer({
           <button
             type="button"
             onClick={onClear}
-            disabled={isBusy || text.length === 0}
+            disabled={isBusy || !canClear}
             aria-label={copy.analyzer.clearAria}
             className="focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-[0.75rem] font-medium text-[#78869a] transition-colors hover:bg-[#f1eeea] hover:text-[#4d5c72] disabled:cursor-not-allowed disabled:opacity-45"
           >

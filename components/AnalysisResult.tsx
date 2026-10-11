@@ -22,7 +22,7 @@ export type AnalysisStatus = "initial" | "loading" | "success" | "error";
 const RESULT_CARD_CLASS = "analysis-result min-w-0 rounded-[16px] border border-white/70 bg-[rgba(255,248,246,0.91)] p-3.5 shadow-[0_12px_28px_rgba(59,40,34,0.09)] sm:rounded-[22px] sm:p-6 sm:pb-8 sm:shadow-[0_20px_42px_rgba(59,40,34,0.11)]";
 
 interface AnalysisResultProps {
-  result: AnalysisResponse;
+  result: AnalysisResponse | null;
   analyzedText: string;
   status: AnalysisStatus;
   timestamp: string;
@@ -38,18 +38,10 @@ export function AnalysisResult({
   errorMessage,
   onRetry,
 }: AnalysisResultProps) {
-  const { copy, locale } = useLanguage();
-  const isFake = result.label === "FAKE";
-  const tone = isFake ? "fake" : "real";
-  const accent = isFake ? "#c7353c" : "#2f7447";
-  const panelClass = isFake
-    ? "border-[#f2d9d4] bg-[linear-gradient(110deg,#ffefec,#fae6e2)]"
-    : "border-[#d6e7d8] bg-[linear-gradient(110deg,#eef7ef,#e3f0e5)]";
-  const isDemo = result.meta?.engine !== "external-model";
-  const isLowConfidence = result.confidence < 0.6;
+  const { copy } = useLanguage();
 
-  // Do not present an unrun multilingual preview as a factual verdict.
-  if (status === "initial" && locale !== "ru") {
+  // A result is shown only after an explicit check or history restore, in every language.
+  if (status === "initial" || (!result && status === "success")) {
     return (
       <article className={`${RESULT_CARD_CLASS} result-empty`} aria-live="polite">
         <header className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -59,11 +51,20 @@ export function AnalysisResult({
         <div className="result-empty-body">
           <span className="result-empty-icon" aria-hidden="true"><SearchCheck size={36} strokeWidth={1.6} /></span>
           <h3 className="font-serif">{copy.analyzer.submit}</h3>
-          <p>{locale === "uz" ? "Matn kiriting yoki fayl yuklang. Tekshirish natijasi va topilgan manbalar shu yerda ko‘rinadi." : "Enter text or upload a file. Your result and retrieved sources will appear here after checking."}</p>
+          <p>{copy.emptyResult.description}</p>
         </div>
       </article>
     );
   }
+
+  const isFake = result?.label === "FAKE";
+  const tone = isFake ? "fake" : "real";
+  const accent = isFake ? "#c7353c" : "#2f7447";
+  const panelClass = isFake
+    ? "border-[#f2d9d4] bg-[linear-gradient(110deg,#ffefec,#fae6e2)]"
+    : "border-[#d6e7d8] bg-[linear-gradient(110deg,#eef7ef,#e3f0e5)]";
+  const isDemo = result?.meta?.engine !== "external-model";
+  const isLowConfidence = (result?.confidence ?? 1) < 0.6;
 
   return (
     <motion.article
@@ -79,10 +80,12 @@ export function AnalysisResult({
         <div className="flex min-w-0 flex-1 basis-[12rem] items-center gap-2 sm:gap-3">
           <span
             className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] sm:h-9 sm:w-9 sm:rounded-[11px] ${
-              isFake ? "bg-[#ffe6e3] text-[#d63b43]" : "bg-[#e0eee2] text-[#34794b]"
+              !result ? "bg-[#e2edf6] text-[#285b87]" : isFake ? "bg-[#ffe6e3] text-[#d63b43]" : "bg-[#e0eee2] text-[#34794b]"
             }`}
           >
-            {isFake ? (
+            {!result ? (
+              <SearchCheck size={18} strokeWidth={2} aria-hidden="true" />
+            ) : isFake ? (
               <AlertCircle size={18} strokeWidth={2} aria-hidden="true" />
             ) : (
               <CheckCircle2 size={18} strokeWidth={2} aria-hidden="true" />
@@ -92,7 +95,7 @@ export function AnalysisResult({
             {copy.result.heading}
           </h2>
         </div>
-        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+        {result ? <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
           <span
             className={`rounded-md px-1.5 py-0.5 text-[0.46875rem] font-extrabold uppercase tracking-[0.07em] sm:px-2 sm:py-1 sm:text-[0.5625rem] ${
               isDemo
@@ -105,7 +108,7 @@ export function AnalysisResult({
           <time className="max-w-[72px] text-right text-[0.5rem] leading-tight font-medium text-[#768398] sm:max-w-none sm:text-[0.6875rem]">
             {timestamp}
           </time>
-        </div>
+        </div> : null}
       </header>
 
       <AnimatePresence mode="wait" initial={false}>
@@ -147,7 +150,7 @@ export function AnalysisResult({
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : result ? (
           <motion.div
             key={`${result.label}-${result.confidence}`}
             initial={{ opacity: 0, y: 8 }}
@@ -215,7 +218,7 @@ export function AnalysisResult({
               timestamp={timestamp}
             />
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </motion.article>
   );
