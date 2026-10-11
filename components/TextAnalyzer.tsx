@@ -280,7 +280,7 @@ export function TextAnalyzer({
           whileTap={isBusy ? undefined : { scale: 0.99 }}
           disabled={isBusy}
           onClick={onSubmit}
-          className="focus-ring group inline-flex min-h-12 flex-1 items-center justify-center gap-3 rounded-[12px] bg-[linear-gradient(100deg,#0b2a4a,#244f78)] px-5 text-[0.875rem] font-bold text-white shadow-[0_10px_20px_rgba(13,47,79,0.15)] disabled:cursor-wait disabled:opacity-85 sm:min-h-[58px] sm:max-w-[345px] sm:gap-4 sm:rounded-[14px] sm:px-7 sm:text-[1rem]"
+          className="analyzer-submit focus-ring group inline-flex min-h-12 flex-1 items-center justify-center gap-3 rounded-[12px] bg-[linear-gradient(100deg,#0b2a4a,#244f78)] px-5 text-[0.875rem] font-bold text-white shadow-[0_10px_20px_rgba(13,47,79,0.15)] disabled:cursor-wait disabled:opacity-85 sm:min-h-[58px] sm:max-w-[345px] sm:gap-4 sm:rounded-[14px] sm:px-7 sm:text-[1rem]"
         >
           {isLoading ? (
             <>

@@ -33,19 +33,22 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [locale, updateLocale] = useState<AppLocale>(DEFAULT_LOCALE);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (isAppLocale(saved) && saved !== DEFAULT_LOCALE) {
-      startTransition(() => updateLocale(saved));
-    }
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (isAppLocale(saved) && saved !== DEFAULT_LOCALE) {
+        startTransition(() => updateLocale(saved));
+      }
+    } catch { /* Language switching still works when browser storage is disabled. */ }
   }, []);
 
   useEffect(() => {
     document.documentElement.lang = localeTags[locale];
+    document.documentElement.dataset.locale = locale;
   }, [locale]);
 
   const setLocale = useCallback((nextLocale: AppLocale) => {
     updateLocale(nextLocale);
-    window.localStorage.setItem(STORAGE_KEY, nextLocale);
+    try { window.localStorage.setItem(STORAGE_KEY, nextLocale); } catch { /* Session-only preference. */ }
   }, []);
 
   const value = useMemo(

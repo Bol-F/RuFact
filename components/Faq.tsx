@@ -9,7 +9,7 @@ export function Faq() {
     <section
       id="questions"
       aria-labelledby="faq-title"
-      className="content-gutter scroll-mt-20 pb-5 pt-5 sm:pb-10 sm:pt-10"
+      className="site-faq content-gutter scroll-mt-20 pb-5 pt-5 sm:pb-10 sm:pt-10"
     >
       <div className="grid gap-4 border-t border-[#d8d4cd] pt-5 sm:gap-7 sm:pt-8 lg:grid-cols-[0.62fr_1.38fr] lg:gap-12">
         <div>

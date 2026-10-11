@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Info,
   RefreshCw,
+  SearchCheck,
 } from "lucide-react";
 import type { AnalysisResponse } from "@/lib/api";
 import { ConfidenceRing } from "./ConfidenceRing";
@@ -35,7 +36,7 @@ export function AnalysisResult({
   errorMessage,
   onRetry,
 }: AnalysisResultProps) {
-  const { copy } = useLanguage();
+  const { copy, locale } = useLanguage();
   const isFake = result.label === "FAKE";
   const tone = isFake ? "fake" : "real";
   const accent = isFake ? "#c7353c" : "#2f7447";
@@ -45,6 +46,20 @@ export function AnalysisResult({
   const isDemo = result.meta?.engine !== "external-model";
   const isLowConfidence = result.confidence < 0.6;
 
+  // Do not present an unrun multilingual preview as a factual verdict.
+  if (status === "initial" && locale !== "ru") {
+    return (
+      <article className="analysis-result result-empty" aria-live="polite">
+        <h2 className="font-serif">{copy.result.heading}</h2>
+        <div className="result-empty-body">
+          <span className="result-empty-icon" aria-hidden="true"><SearchCheck size={36} strokeWidth={1.6} /></span>
+          <h3 className="font-serif">{copy.analyzer.submit}</h3>
+          <p>{locale === "uz" ? "Matn kiriting yoki fayl yuklang. Tekshirish natijasi va topilgan manbalar shu yerda ko‘rinadi." : "Enter text or upload a file. Your result and retrieved sources will appear here after checking."}</p>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <motion.article
       layout
@@ -53,7 +68,7 @@ export function AnalysisResult({
       transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
       aria-live="polite"
       aria-busy={status === "loading"}
-      className="rounded-[16px] border border-white/70 bg-[rgba(255,248,246,0.91)] p-3.5 shadow-[0_12px_28px_rgba(59,40,34,0.09)] sm:rounded-[22px] sm:p-6 sm:pb-8 sm:shadow-[0_20px_42px_rgba(59,40,34,0.11)]"
+      className="analysis-result rounded-[16px] border border-white/70 bg-[rgba(255,248,246,0.91)] p-3.5 shadow-[0_12px_28px_rgba(59,40,34,0.09)] sm:rounded-[22px] sm:p-6 sm:pb-8 sm:shadow-[0_20px_42px_rgba(59,40,34,0.11)]"
     >
       <header className="flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">

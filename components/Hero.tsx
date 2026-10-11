@@ -8,6 +8,7 @@ import { chatCopy } from "@/lib/chat-copy";
 
 import { MODEL_QUALITY } from "@/lib/model-quality";
 import { useLanguage } from "./LanguageProvider";
+import { RegionalHero } from "./RegionalHero";
 
 const enter = {
   hidden: { opacity: 0, y: 16 },
@@ -17,6 +18,8 @@ const enter = {
 export function Hero() {
   const accuracy = MODEL_QUALITY.metrics.find((metric) => metric.key === "accuracy")?.value;
   const { locale, copy } = useLanguage();
+
+  if (locale !== "ru") return <RegionalHero />;
 
   return (
     <section

@@ -10,7 +10,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
 
   return (
     <label
-      className={`focus-within:ring-2 focus-within:ring-[#789bb8] inline-flex items-center rounded-[11px] border border-[#d7d8d3] bg-[#fbfaf6]/90 text-[#173552] ${
+      className={`language-switcher focus-within:ring-2 focus-within:ring-[#789bb8] inline-flex items-center rounded-[11px] border border-[#d7d8d3] bg-[#fbfaf6]/90 text-[#173552] ${
         compact ? "min-h-11 w-full px-2.5" : "min-h-11 px-3"
       }`}
     >

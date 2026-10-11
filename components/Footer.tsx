@@ -12,7 +12,7 @@ export function Footer() {
   const { copy } = useLanguage();
 
   return (
-    <footer className="content-gutter pb-3 pt-1 sm:pb-6 sm:pt-2">
+    <footer className="site-footer content-gutter pb-3 pt-1 sm:pb-6 sm:pt-2">
       <div className="mb-3 rounded-[14px] border border-[#d7d8d3] bg-white/50 px-4 py-3">
         <TextSizeControl />
       </div>

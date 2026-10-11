@@ -3,6 +3,7 @@ import { Caveat, Lora, Manrope } from "next/font/google";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
+import "./regional-themes.css";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -48,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz-Latn-UZ" data-scroll-behavior="smooth">
+    <html lang="uz-Latn-UZ" data-locale="uz" data-scroll-behavior="smooth">
       <body
         className={`${lora.variable} ${manrope.variable} ${caveat.variable}`}
       >

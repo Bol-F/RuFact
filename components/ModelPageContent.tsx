@@ -72,35 +72,40 @@ export function ModelPageContent() {
 
   return (
     <>
-      <section aria-labelledby="model-page-heading" className="content-gutter pb-5 pt-4 sm:pb-8 sm:pt-7">
+      <section aria-labelledby="model-page-heading" className="regional-model-intro content-gutter pb-5 pt-4 sm:pb-8 sm:pt-7">
         <Link href="/#analyzer" className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d7d8d3] bg-[#fbfaf6]/80 px-3.5 text-[0.75rem] font-bold text-[#486177] transition-colors hover:bg-white hover:text-ink">
           <ArrowLeft size={15} strokeWidth={2} aria-hidden="true" />
           {copy.back}
         </Link>
-        <div className="mt-5 max-w-[780px] sm:mt-7">
+        <div className="regional-model-lead mt-5 max-w-[780px] sm:mt-7">
           <h1 id="model-page-heading" className="font-serif text-[2.25rem] leading-[1.03] font-semibold tracking-[-0.045em] text-ink sm:text-[3.125rem]">{copy.title}</h1>
           <p className="mt-3 text-[0.875rem] leading-[1.65] text-[#607087] sm:text-[1rem]">{copy.intro}</p>
         </div>
       </section>
 
-      <section className="tool-gutter pb-6" aria-labelledby="architecture-heading">
+      <section className="regional-model-architecture tool-gutter pb-6" aria-labelledby="architecture-heading">
         <h2 id="architecture-heading" className="font-serif text-[1.75rem] font-semibold text-ink sm:text-[2.25rem]">{copy.architecture}</h2>
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <div className="regional-model-stages mt-4 grid gap-3 lg:grid-cols-3">
           {copy.stages.map((stage, index) => {
             const Icon = icons[index];
             return (
-              <article key={stage.title} className="rounded-[18px] border border-[#d9ddd9] bg-white/55 p-5 shadow-[0_10px_28px_rgba(21,45,63,0.05)]">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e5eef2] text-[#315f78]"><Icon size={20} aria-hidden="true" /></span>
-                <h3 className="mt-4 text-[1rem] font-extrabold text-[#173552]">{stage.title}</h3>
-                <p className="mt-2 text-[0.75rem] leading-[1.6] text-[#647589]">{stage.description}</p>
-                <p className="mt-4 border-t border-[#e1e3df] pt-3 text-[0.625rem] font-bold text-[#778694]">{stage.detail}</p>
+              <article key={stage.title} className="regional-model-stage rounded-[18px] border border-[#d9ddd9] bg-white/55 p-5 shadow-[0_10px_28px_rgba(21,45,63,0.05)]">
+                <div className="regional-model-stage-marker flex items-center justify-between gap-3">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e5eef2] text-[#315f78]"><Icon size={20} aria-hidden="true" /></span>
+                  <span className="regional-model-stage-number text-sm font-bold tabular-nums text-[#778694]" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                </div>
+                <div className="regional-model-stage-copy min-w-0">
+                  <h3 className="mt-4 text-[1rem] font-extrabold text-[#173552]">{stage.title}</h3>
+                  <p className="mt-2 text-[0.75rem] leading-[1.6] text-[#647589]">{stage.description}</p>
+                  <p className="regional-model-stage-detail mt-4 border-t border-[#e1e3df] pt-3 text-[0.625rem] font-bold text-[#778694]">{stage.detail}</p>
+                </div>
               </article>
             );
           })}
         </div>
       </section>
 
-      <section className="tool-gutter grid gap-4 pb-8 lg:grid-cols-2">
+      <section className="regional-model-notes tool-gutter grid gap-4 pb-8 lg:grid-cols-2">
         <article className="rounded-[18px] border border-[#ebd6bd] bg-[#fff8ec] p-5 sm:p-6">
           <h2 className="text-[1.0625rem] font-extrabold text-[#76502d]">{copy.accuracyTitle}</h2>
           <p className="mt-2 text-[0.75rem] leading-[1.65] text-[#785f49]">{copy.accuracy}</p>

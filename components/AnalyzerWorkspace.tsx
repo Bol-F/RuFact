@@ -45,7 +45,6 @@ export function AnalyzerWorkspace({ geminiConfigured }: AnalyzerWorkspaceProps) 
   const { locale, copy } = useLanguage();
   return (
     <AnalyzerWorkspaceSession
-      key={locale}
       locale={locale}
       copy={copy}
       geminiConfigured={geminiConfigured}
@@ -73,12 +72,15 @@ function AnalyzerWorkspaceSession({
           externalSourcesChecked: false,
         },
       };
-  const [text, setText] = useState<string>(initialExample.text);
+  // An untouched example follows the UI language; user-entered or uploaded text never resets.
+  const [text, setText] = useState<string | null>(null);
+  const inputText = text ?? initialExample.text;
   const [activeExampleId, setActiveExampleId] = useState<string | null>("medical");
-  const [result, setResult] = useState<AnalysisResponse>(initialResult);
-  const [analyzedText, setAnalyzedText] = useState<string>(initialExample.text);
+  const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [analyzedText, setAnalyzedText] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>("initial");
-  const [timestamp, setTimestamp] = useState(() => formatTimestamp(new Date("2024-11-26T14:37:00"), locale));
+  const [analyzedAt, setAnalyzedAt] = useState(() => new Date("2024-11-26T14:37:00"));
+  const timestamp = formatTimestamp(analyzedAt, locale);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -146,7 +148,7 @@ function AnalyzerWorkspaceSession({
   };
 
   const handleSubmit = async () => {
-    const normalizedText = text.trim();
+    const normalizedText = inputText.trim();
 
     if (!normalizedText) {
       setValidationMessage(copy.analyzer.required);
@@ -156,6 +158,8 @@ function AnalyzerWorkspaceSession({
 
     setValidationMessage(null);
     setErrorMessage(null);
+    // Once checking begins, the submitted sample is a draft too; don't swap it mid-request.
+    setText(normalizedText);
     setStatus("loading");
 
     try {
@@ -163,7 +167,7 @@ function AnalyzerWorkspaceSession({
       const analyzedAt = new Date();
       setResult(nextResult);
       setAnalyzedText(normalizedText);
-      setTimestamp(formatTimestamp(analyzedAt, locale));
+      setAnalyzedAt(analyzedAt);
       setStatus("success");
 
       history.add({
@@ -204,7 +208,7 @@ function AnalyzerWorkspaceSession({
     setAnalyzedText(item.text);
     setActiveExampleId(null);
     setResult(restoredResult);
-    setTimestamp(formatTimestamp(new Date(item.analyzedAt), locale));
+    setAnalyzedAt(new Date(item.analyzedAt));
     setValidationMessage(null);
     setErrorMessage(null);
     setStatus("success");
@@ -217,9 +221,9 @@ function AnalyzerWorkspaceSession({
       aria-label={copy.analyzer.region}
       className="tool-gutter relative z-10 pb-4 pt-1 sm:pb-6 sm:pt-[11px]"
     >
-      <div className="grid items-start gap-3 sm:gap-[18px] lg:grid-cols-[minmax(0,1.25fr)_minmax(390px,0.95fr)]">
+      <div className="analyzer-grid grid items-start gap-3 sm:gap-[18px] lg:grid-cols-[minmax(0,1.25fr)_minmax(390px,0.95fr)]">
         <TextAnalyzer
-          text={text}
+          text={inputText}
           examples={examples}
           activeExampleId={activeExampleId}
           isLoading={status === "loading"}
@@ -240,10 +244,10 @@ function AnalyzerWorkspaceSession({
           onUseGeminiChange={setUseGemini}
         />
 
-        <div className="lg:-mt-[72px] xl:-mt-[104px]">
+        <div className="analyzer-result-slot lg:-mt-[72px] xl:-mt-[104px]">
           <AnalysisResult
-            result={result}
-            analyzedText={analyzedText}
+            result={result ?? initialResult}
+            analyzedText={analyzedText ?? initialExample.text}
             status={status}
             timestamp={timestamp}
             errorMessage={errorMessage}

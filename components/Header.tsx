@@ -25,7 +25,7 @@ export function Header() {
   ];
 
   return (
-    <header id="top" className="content-gutter relative z-50">
+    <header id="top" className="site-header content-gutter relative z-50">
       <div className="flex min-h-[62px] items-center justify-between gap-4 sm:min-h-[88px] lg:min-h-[98px]">
         <Brand />
 
@@ -50,17 +50,17 @@ export function Header() {
           <button
             type="button"
             onClick={() => openFeedback({ source: "header" })}
-            className="focus-ring inline-flex min-h-11 items-center rounded-[13px] bg-ink-deep px-6 text-[0.875rem] font-semibold text-white shadow-[0_7px_18px_rgba(10,41,73,0.16)] transition-transform hover:-translate-y-0.5"
+            className="header-feedback focus-ring inline-flex min-h-11 items-center rounded-[13px] bg-ink-deep px-6 text-[0.875rem] font-semibold text-white shadow-[0_7px_18px_rgba(10,41,73,0.16)] transition-transform hover:-translate-y-0.5"
           >
             {copy.navigation.feedback}
           </button>
         </div>
 
         <div className="ml-auto flex items-center gap-2 xl:hidden">
-          {pathname !== "/chat" ? <Link href="/chat" aria-label={chatCopy[locale].open} className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-[#cfdbd4] bg-[#edf3ee] px-3 text-xs font-bold text-[#376b60]"><MessageCircle size={16} /><span className="hidden min-[380px]:inline">{chatCopy[locale].nav}</span></Link> : null}
+          {pathname !== "/chat" ? <Link href="/chat" aria-label={chatCopy[locale].open} className="header-chat focus-ring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-[#cfdbd4] bg-[#edf3ee] px-3 text-xs font-bold text-[#376b60]"><MessageCircle size={16} /><span className="hidden min-[380px]:inline">{chatCopy[locale].nav}</span></Link> : null}
         <button
           type="button"
-          className="focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#d7d8d3] bg-[#fbfaf6] text-ink xl:hidden"
+          className="header-menu focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#d7d8d3] bg-[#fbfaf6] text-ink xl:hidden"
           aria-expanded={isOpen}
           aria-controls="mobile-navigation"
           aria-label={isOpen ? copy.navigation.closeMenu : copy.navigation.openMenu}

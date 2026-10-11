@@ -22,6 +22,7 @@ test("hero artwork loads from the public asset", async ({ page }, testInfo) => {
   });
 
   await page.goto("/");
+  await selectRussian(page);
 
   await expect(page).toHaveTitle(/RuFact/u);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -340,10 +341,12 @@ test("switches the full interface language and remembers the choice", async ({ p
     },
   );
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Check a text");
-  await expect(page.getByLabel("Text to analyze")).toHaveValue(/Scientists have proven/u);
+  await expect(page.getByLabel("Text to analyse")).toHaveValue(/Scientists have proven/u);
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Check a text");
+  const draft = "This user draft must stay when the design changes.";
+  await page.getByLabel("Text to analyse").fill(draft);
 
   await page.locator('select[aria-label="Choose language"]').first().evaluate(
     (select) => {
@@ -353,5 +356,5 @@ test("switches the full interface language and remembers the choice", async ({ p
     },
   );
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Проверьте текст");
-  await expect(page.getByLabel("Текст для анализа")).toHaveValue(/Учёные подтвердили/u);
+  await expect(page.getByLabel("Текст для анализа")).toHaveValue(draft);
 });
