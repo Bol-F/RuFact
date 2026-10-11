@@ -258,6 +258,42 @@ test("language switches retain aligned in-flight and completed analyzer results"
   expect(requests).toHaveLength(widths.length);
 });
 
+test("enlarged text keeps narrow desktop verdicts and result headings readable", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop"), "Narrow desktop result layout");
+  await page.setViewportSize({ width: 1024, height: 1000 });
+  await page.route("**/api/analyze", route => route.fulfill({ json: {
+    label: "REAL", confidence: 0.83,
+    explanation: "Mocked result for enlarged-text layout coverage.",
+    meta: { engine: "external-model", engineVersion: "layout-regression-v1", externalSourcesChecked: false },
+  } }));
+  await page.goto("/");
+  await page.locator(".site-footer .text-size-control button").last().click();
+  await expect(page.locator("html")).toHaveAttribute("data-text-size", "larger");
+  await changeLanguage(page, "ru");
+  async function expectReadableResult() {
+    await expect.poll(() => page.locator(".analysis-result").evaluate(element => {
+      const heading = element.querySelector("header h2") as HTMLElement;
+      const section = element.querySelector("section[aria-label]")!;
+      const copy = section.firstElementChild!.getBoundingClientRect();
+      const ring = section.querySelector('[role="meter"]')!.getBoundingClientRect();
+      return {
+        headingFits: heading.scrollWidth <= heading.clientWidth + 1 && heading.scrollHeight <= heading.clientHeight + 1,
+        verdictOverlapsRing: copy.left < ring.right && copy.right > ring.left && copy.top < ring.bottom && copy.bottom > ring.top,
+      };
+    })).toEqual({ headingFits: true, verdictOverlapsRing: false });
+    await expectPanelLayout(page, true);
+    await expectNoOverflow(page);
+  }
+  await expectReadableResult();
+  await page.locator("#analysis-text").fill("Toshkent is the capital of Uzbekistan.");
+  await page.locator(".analyzer-submit").click();
+  await expect(page.locator('.analysis-result section[aria-label$=": REAL"]')).toBeVisible();
+  for (const locale of ["ru", "uz", "en"] as const) {
+    await changeLanguage(page, locale);
+    await expectReadableResult();
+  }
+});
+
 test("phones avoid downloading decorative regional artwork after language switching", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile"), "Phone image source selection");
   const artworkRequests: string[] = [];
@@ -330,7 +366,7 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
         await expect(artwork.locator(".regional-note-start")).toBeVisible();
         await expect(artwork.locator(".regional-note-end")).toBeVisible();
         await expect(artwork.locator(".regional-note-start span.block")).toHaveText(notes[locale].start);
-        await expect(artwork.locator(".regional-note-end span.block")).toHaveText(notes[locale].end);
+        await expect(artwork.locator(".regional-note-end span.block").filter({ hasText: /\S/ })).toHaveText(notes[locale].end);
         for (const selector of [".site-hero", ".analyzer-grid"]) {
           expect(await page.locator(selector).evaluate(element =>
             getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,

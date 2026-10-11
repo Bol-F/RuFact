@@ -63,9 +63,7 @@ export function TextAnalyzer({
   const { locale, copy } = useLanguage();
 
   return (
-    <motion.article
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.22 }}
+    <article
       className="text-analyzer rounded-[16px] border border-white/70 bg-[rgba(252,250,247,0.94)] p-3.5 shadow-[0_10px_26px_rgba(24,41,55,0.07)] sm:rounded-[21px] sm:p-5 sm:shadow-[0_14px_34px_rgba(24,41,55,0.075)]"
     >
       <div className="analyzer-heading-row mb-2.5 flex items-center justify-between gap-3 sm:mb-3 sm:gap-4">
@@ -305,6 +303,6 @@ export function TextAnalyzer({
           <span className="hidden sm:inline"><br />{copy.analyzer.helperDesktop}</span>
         </p>
       </div>
-    </motion.article>
+    </article>
   );
 }
