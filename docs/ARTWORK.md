@@ -23,7 +23,7 @@ Mode: built-in `image_gen`, not CLI. All final assets are stored in `public/`, n
 
 ## Shared design and mobile performance
 
-- Uzbek, Russian, and English share the Russian visual design: navy with copper-orange accents, warm textured paper, a rounded shell, a transparent header, and the same hero, typography, controls, and card family. There are no locale-specific palettes or interface geometries.
+- Uzbek, Russian, and English share the Russian-derived layout: warm textured paper, a rounded shell, a transparent header, and the same hero, typography, controls, and card family. Colours retain their regional identity: Russian navy/orange, Uzbek teal, and English navy/muted copper. Palette changes do not change interface geometry or semantic red/green verdict colours.
 - Copy, handwritten annotations, and collage locations remain localised: Samarkand for Uzbek, Moscow for Russian, and Westminster for English. All three heroes use the same responsive layout and `object-fit: contain` so the collage and tall buildings are not cropped.
 - The desktop editor and result panels have aligned top edges. On phones, they stack in one column.
 - Below 768px, artwork and handwritten notes are hidden for all three languages. A `<picture>` media source supplies a tiny inline GIF instead of downloading the decorative asset.

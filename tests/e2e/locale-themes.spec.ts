@@ -47,11 +47,11 @@ async function expectPanelLayout(page: Page, desktop: boolean) {
 
 async function sharedPresentation(page: Page) {
   const surfaces = {
-    shell: { selector: ".paper-shell", properties: ["background-color", "border-radius", "border-color", "box-shadow"] },
-    header: { selector: ".site-header", properties: ["background-color", "color", "padding-left", "padding-right"] },
-    card: { selector: ".text-analyzer", properties: ["background-color", "border-radius", "border-color", "box-shadow", "padding"] },
-    submit: { selector: ".analyzer-submit", properties: ["background-color", "border-radius", "color", "font-family", "font-size", "font-weight"] },
-    title: { selector: "#hero-heading", properties: ["color", "font-family", "font-size", "font-weight", "letter-spacing", "line-height", "text-align"] },
+    shell: { selector: ".paper-shell", properties: ["border-radius", "border-width", "border-style", "box-shadow", "margin-left", "margin-right"] },
+    header: { selector: ".site-header", properties: ["padding-left", "padding-right"] },
+    card: { selector: ".text-analyzer", properties: ["border-radius", "border-width", "border-style", "box-shadow", "padding"] },
+    submit: { selector: ".analyzer-submit", properties: ["border-radius", "font-family", "font-size", "font-weight"] },
+    title: { selector: "#hero-heading", properties: ["font-family", "font-size", "font-weight", "letter-spacing", "line-height", "text-align"] },
   };
   return page.evaluate(definitions => Object.fromEntries(Object.entries(definitions).map(([name, definition]) => {
     const style = getComputedStyle(document.querySelector(definition.selector)!);
@@ -59,7 +59,7 @@ async function sharedPresentation(page: Page) {
   })), surfaces);
 }
 
-test("language changes keep the shared Russian presentation without losing the analyzer draft", async ({ page }, testInfo) => {
+test("language changes keep the shared layout without losing the analyzer draft", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
@@ -107,7 +107,7 @@ test("language changes keep the shared Russian presentation without losing the a
   expect(errors).toEqual([]);
 });
 
-test("all languages share the Russian shell, cards, buttons and hero typography", async ({ page }, testInfo) => {
+test("all languages share the Russian geometry and typography with restored regional palettes", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
@@ -119,7 +119,7 @@ test("all languages share the Russian shell, cards, buttons and hero typography"
   for (const locale of ["uz", "en", "ru"] as const) {
     await changeLanguage(page, locale);
     await expect(page.locator(".site-hero")).toBeVisible();
-    expect(await sharedPresentation(page), `${locale} uses shared Russian styles`).toEqual(russianPresentation);
+    expect(await sharedPresentation(page), `${locale} uses shared Russian geometry and typography`).toEqual(russianPresentation);
     await expectPanelLayout(page, testInfo.project.name.startsWith("desktop"));
     await expectNoOverflow(page);
   }
@@ -131,23 +131,64 @@ test("all languages share the Russian shell, cards, buttons and hero typography"
   expect(errors).toEqual([]);
 });
 
+test("Uzbek teal and English navy-copper colors apply to the shared hero and controls", async ({ page }) => {
+  await page.goto("/");
+  const palettes = {
+    uz: { ink: "rgb(20, 61, 67)", accent: "rgb(8, 127, 131)", primary: "rgb(8, 127, 131)" },
+    en: { ink: "rgb(21, 38, 63)", accent: "rgb(162, 91, 54)", primary: "rgb(21, 38, 63)" },
+  };
+  for (const locale of ["uz", "en", "uz"] as const) {
+    await changeLanguage(page, locale);
+    const palette = palettes[locale];
+    await expect(page.locator("#hero-heading")).toHaveCSS("color", palette.ink);
+    await expect(page.locator(".hero-title-accent")).toHaveCount(3);
+    for (const accent of await page.locator(".hero-title-accent").all()) {
+      await expect(accent).toHaveCSS("color", palette.accent);
+    }
+    await expect(page.locator("header .brand > span:first-child > span:first-child")).toHaveCSS("background-color", palette.ink);
+    await expect(page.locator("header .brand > span:first-child > span:last-child")).toHaveCSS("background-color", palette.accent);
+    await expect(page.locator(".hero-primary")).toHaveCSS("background-color", palette.primary);
+    await expect(page.locator(".header-feedback")).toHaveCSS("background-color", palette.primary);
+    await expect(page.locator(".analyzer-submit")).toHaveCSS("background-color", palette.primary);
+    await expect(page.locator(".analyzer-submit")).toHaveCSS("background-image", "none");
+    await page.keyboard.press("Tab");
+    await page.locator(".hero-primary").focus();
+    await expect(page.locator(".hero-primary")).toHaveCSS("outline-color", palette.accent);
+    await expect(page.locator(".hero-primary")).toHaveCSS("outline-width", "3px");
+  }
+  await changeLanguage(page, "ru");
+  await expect(page.locator("#hero-heading")).toHaveCSS("color", "rgb(16, 47, 80)");
+  await expect(page.locator(".hero-title-accent")).toHaveCount(3);
+  for (const accent of await page.locator(".hero-title-accent").all()) {
+    await expect(accent).toHaveCSS("color", "rgb(201, 66, 30)");
+  }
+  await expect(page.locator("header .brand > span:first-child > span:last-child")).toHaveCSS("background-color", "rgb(226, 122, 66)");
+  await expect(page.locator(".header-feedback")).toHaveCSS("background-color", "rgb(10, 41, 73)");
+  await expect(page.locator(".analyzer-submit")).not.toHaveCSS("background-image", "none");
+  await expect(page.locator('.analysis-result section[aria-label$=": FAKE"] p').first()).toHaveCSS("color", "rgb(199, 53, 60)");
+});
+
 test("selected regional design persists through model and chat navigation and reload", async ({ page }) => {
   await page.goto("/");
   await changeLanguage(page, "en");
   await navigateFromHeader(page, "/model");
   await expect(page.locator("html")).toHaveAttribute("data-locale", "en");
   await expect(page.locator("html")).toHaveAttribute("lang", "en-GB");
+  await expect(page.locator("body")).toHaveCSS("color", "rgb(21, 38, 63)");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expectNoOverflow(page);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-locale", "en");
   await navigateFromHeader(page, "/chat");
   await expect(page.locator("html")).toHaveAttribute("data-locale", "en");
+  await expect(page.locator("body")).toHaveCSS("color", "rgb(21, 38, 63)");
   await expect(page.getByRole("textbox", { name: "Question for AI chat" })).toBeVisible();
   await changeLanguage(page, "uz");
   await expect(page.getByRole("textbox", { name: "AI chat uchun savol" })).toBeVisible();
+  await expect(page.locator("body")).toHaveCSS("color", "rgb(20, 61, 67)");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-locale", "uz");
+  await expect(page.locator("body")).toHaveCSS("color", "rgb(20, 61, 67)");
   await expectNoOverflow(page);
   await navigateFromHeader(page, "/model");
   await expect(page.locator("html")).toHaveAttribute("data-locale", "uz");
@@ -240,18 +281,19 @@ test("language switches retain aligned in-flight and completed analyzer results"
     await expect(result).toContainText("83%");
     const resultStyle = await page.locator(".analysis-result").evaluate(element => {
       const style = getComputedStyle(element);
-      return { background: style.backgroundColor, border: style.borderColor, radius: style.borderRadius, padding: style.padding, shadow: style.boxShadow };
+      return { radius: style.borderRadius, borderWidth: style.borderWidth, borderStyle: style.borderStyle, padding: style.padding };
     });
     for (const locale of ["ru", "uz", "en"] as const) {
       await changeLanguage(page, locale);
       await expect(input).toHaveValue(draft);
       await expect(result).toBeVisible();
       await expect(result).toContainText("83%");
+      await expect(result.locator("p").first()).toHaveCSS("color", "rgb(47, 116, 71)");
       await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "false");
       await expectPanelLayout(page, desktop);
       expect(await page.locator(".analysis-result").evaluate(element => {
         const style = getComputedStyle(element);
-        return { background: style.backgroundColor, border: style.borderColor, radius: style.borderRadius, padding: style.padding, shadow: style.boxShadow };
+        return { radius: style.borderRadius, borderWidth: style.borderWidth, borderStyle: style.borderStyle, padding: style.padding };
       })).toEqual(resultStyle);
     }
   }

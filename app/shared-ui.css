@@ -1,4 +1,72 @@
-/* One Russian-derived design system; locale changes copy and artwork, not UI chrome. */
+/* Shared Russian-derived geometry, with the original regional colour palettes. */
+:root {
+  --hero-title-accent: #c9421e;
+  --hero-note-accent: #d6693a;
+}
+
+html[data-locale="uz"] {
+  --canvas: #f5f2e9;
+  --paper: #f5f2e9;
+  --surface: #ffffff;
+  --ink: #143d43;
+  --ink-deep: #075c64;
+  --orange: #087f83;
+  --region-accent: #087f83;
+  --region-soft: #eaf4f2;
+  --region-border: #d1e0dc;
+  --hero-title-accent: var(--region-accent);
+  --hero-note-accent: var(--region-accent);
+}
+
+html[data-locale="en"] {
+  --canvas: #f5f2e9;
+  --paper: #f5f2e9;
+  --surface: #ffffff;
+  --ink: #15263f;
+  --ink-deep: #15263f;
+  --orange: #a25b36;
+  --region-accent: #a25b36;
+  --region-soft: #edf1f3;
+  --region-border: #d8dedc;
+  --hero-title-accent: var(--region-accent);
+  --hero-note-accent: var(--region-accent);
+}
+
+/* Colour-only overrides: never change sizing, spacing, layout or verdict colours. */
+html:is([data-locale="uz"], [data-locale="en"]) body { background: var(--canvas); }
+html:is([data-locale="uz"], [data-locale="en"]) body::before { background: color-mix(in srgb, var(--region-accent) 24%, transparent); }
+html:is([data-locale="uz"], [data-locale="en"]) body::after { background: color-mix(in srgb, var(--region-accent) 20%, transparent); }
+html:is([data-locale="uz"], [data-locale="en"]) ::selection { background: color-mix(in srgb, var(--region-accent) 18%, transparent); }
+html:is([data-locale="uz"], [data-locale="en"]) .focus-ring:focus-visible { outline-color: var(--region-accent); }
+html:is([data-locale="uz"], [data-locale="en"]) .brand > span:first-child > span:first-child { background: var(--ink); }
+html:is([data-locale="uz"], [data-locale="en"]) .brand > span:first-child > span:last-child { background: var(--region-accent); }
+html:is([data-locale="uz"], [data-locale="en"]) .site-header nav ul { color: var(--ink); }
+html:is([data-locale="uz"], [data-locale="en"]) :is(.language-switcher, .header-menu, #mobile-navigation) { background: var(--surface); border-color: var(--region-border); color: var(--ink); }
+html:is([data-locale="uz"], [data-locale="en"]) .header-chat { background: var(--region-soft); border-color: var(--region-border); color: var(--ink); }
+html:is([data-locale="uz"], [data-locale="en"]) :is(.text-analyzer, .analysis-result) { background: var(--surface); border-color: var(--region-border); }
+html:is([data-locale="uz"], [data-locale="en"]) :is(.analyzer-heading-row h2, .analysis-result h2) { color: var(--ink); }
+html:is([data-locale="uz"], [data-locale="en"]) #analysis-text { background: var(--surface); }
+html:is([data-locale="uz"], [data-locale="en"]) .analyzer-submit { background: var(--ink-deep); }
+html[data-locale="uz"] :is(.header-feedback, .hero-primary, .analyzer-submit) { background: var(--region-accent); }
+html:is([data-locale="uz"], [data-locale="en"]) #use-gemini { accent-color: var(--ink-deep); }
+html:is([data-locale="uz"], [data-locale="en"]) .text-analyzer section[aria-labelledby="gemini-option-heading"] { border-color: var(--region-border); background: var(--region-soft); }
+html:is([data-locale="uz"], [data-locale="en"]) .result-empty-body { background: var(--region-soft); }
+html:is([data-locale="uz"], [data-locale="en"]) .site-faq > div { border-color: var(--region-border); }
+html:is([data-locale="uz"], [data-locale="en"]) .site-footer > div:last-child { background: var(--ink-deep); }
+html:is([data-locale="uz"], [data-locale="en"]) .site-footer .brand > span:first-child > span:first-child { background: #ffffff; }
+html[data-locale="uz"] .site-footer .brand > span:first-child > span:last-child { background: #a7ded5; }
+html[data-locale="en"] .site-footer .brand > span:first-child > span:last-child { background: #e7b69a; }
+html:is([data-locale="uz"], [data-locale="en"]) :is(.chat-panel, .chat-composer) { background: var(--surface); border-color: var(--region-border); }
+html:is([data-locale="uz"], [data-locale="en"]) :is(.chat-toolbar, .chat-answer, .chat-prompt) { background: var(--region-soft); border-color: var(--region-border); }
+html:is([data-locale="uz"], [data-locale="en"]) .chat-question { background: var(--ink-deep); }
+html:is([data-locale="uz"], [data-locale="en"]) .chat-answer :is(a, summary, .chat-answer-label) { color: var(--ink-deep); }
+html:is([data-locale="uz"], [data-locale="en"]) .regional-model-architecture > div { background: var(--surface); border-color: var(--region-border); }
+html:is([data-locale="uz"], [data-locale="en"]) .regional-model-stage { border-color: var(--region-border); }
+html:is([data-locale="uz"], [data-locale="en"]) .regional-model-stage-number { color: var(--region-accent); }
+
+.hero-title-accent { color: var(--hero-title-accent); }
+.hero-note-underline { background: var(--hero-note-accent); }
+
 .site-hero {
   position: relative;
   display: grid;

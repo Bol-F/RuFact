@@ -52,12 +52,12 @@ export function Hero() {
           <span className="md:hidden">
             {copy.hero.mobileTitleStart}
             <br />
-            <span className="text-[#c9421e]">{copy.hero.mobileTitleAccent}</span>
+            <span className="hero-title-accent">{copy.hero.mobileTitleAccent}</span>
           </span>
           <span className="hidden md:inline">
             <span className="block">{copy.hero.desktopLine1}</span>
-            <span className="block text-[#c9421e]">{copy.hero.desktopLine2}</span>
-            <span className="block text-[#c9421e]">{copy.hero.desktopLine3}</span>
+            <span className="hero-title-accent block">{copy.hero.desktopLine2}</span>
+            <span className="hero-title-accent block">{copy.hero.desktopLine3}</span>
           </span>
         </motion.h1>
 
@@ -116,7 +116,7 @@ export function Hero() {
 
         <div className={`hero-note hero-note-end font-hand${artwork ? " regional-note regional-note-end" : ""}`} aria-hidden="true">
           {copy.hero.noteRight.split("\n").map((line) => <span className="block" key={line}>{line}</span>)}
-          <span className="mt-2 block h-px w-14 -rotate-6 bg-[#d6693a]" />
+          <span className="hero-note-underline mt-2 block h-px w-14 -rotate-6" />
         </div>
       </motion.div>
     </section>
