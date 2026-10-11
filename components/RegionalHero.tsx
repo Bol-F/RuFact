@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUpRight, MessageCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { chatCopy } from "@/lib/chat-copy";
+import { REGIONAL_ARTWORK } from "@/lib/regional-artwork";
 import { useLanguage } from "./LanguageProvider";
 
 /** Regional presentation only: checking, sources and state are shared across locales. */
@@ -11,6 +12,7 @@ export function RegionalHero() {
   const { locale, copy } = useLanguage();
   if (locale === "ru") return null;
   const uzbek = locale === "uz";
+  const artwork = REGIONAL_ARTWORK[locale];
 
   return (
     <section id="how-it-works" aria-labelledby="hero-heading" data-region={uzbek ? "uzbekistan" : "united-kingdom"} className="regional-hero content-gutter">
@@ -30,8 +32,19 @@ export function RegionalHero() {
         <picture>
           {/* Hidden on phones: a tiny local data source avoids downloading decorative artwork. */}
           <source media="(max-width: 767px)" srcSet="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" />
-          <Image src={uzbek ? "/hero-uzbekistan.webp" : "/hero-united-kingdom.webp"} alt="" fill sizes={uzbek ? "(max-width: 1023px) 45vw, 600px" : "1200px"} loading="eager" fetchPriority="high" className="object-cover" />
+          <Image src={artwork.src} alt="" fill sizes="(max-width: 1023px) 45vw, 680px" loading="eager" fetchPriority="high" className="regional-collage" />
         </picture>
+        <div className="regional-note regional-note-start font-hand">
+          {copy.hero.noteLeft.split("\n").map((line) => <span className="block" key={line}>{line}</span>)}
+          <svg width="68" height="32" viewBox="0 0 68 32" fill="none" className="regional-note-arrow" aria-hidden="true">
+            <path d="M2 25C20 4 39 5 60 18" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            <path d="M53 11L61 18L51 19" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <div className="regional-note regional-note-end font-hand">
+          {copy.hero.noteRight.split("\n").map((line) => <span className="block" key={line}>{line}</span>)}
+          <span className="regional-note-underline" />
+        </div>
       </div>
     </section>
   );

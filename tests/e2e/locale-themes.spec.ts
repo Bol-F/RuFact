@@ -58,7 +58,7 @@ test("language changes switch regional designs without losing the analyzer draft
     const englishColumns = await page.locator(".analyzer-grid").evaluate(element =>
       getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,
     );
-    expect(englishColumns).toBe(1);
+    expect(englishColumns).toBe(2);
   }
 
   await changeLanguage(page, "ru");
@@ -191,7 +191,7 @@ test("phones avoid downloading decorative regional artwork after language switch
   test.skip(!testInfo.project.name.startsWith("mobile"), "Phone image source selection");
   const artworkRequests: string[] = [];
   page.on("request", request => {
-    if (/hero-(?:uzbekistan|united-kingdom)\.webp/.test(request.url())) {
+    if (/hero-(?:uzbekistan|united-kingdom)(?:-collage)?\.webp/.test(request.url())) {
       artworkRequests.push(request.url());
     }
   });
@@ -201,7 +201,9 @@ test("phones avoid downloading decorative regional artwork after language switch
     if (locale === "en") await changeLanguage(page, locale);
     const region = locale === "uz" ? "uzbekistan" : "united-kingdom";
     await expect(page.locator(".regional-hero")).toHaveAttribute("data-region", region);
-    await expect(artwork).toHaveAttribute("src", new RegExp(`hero-${region}\\.webp`));
+    await expect(artwork).toHaveAttribute("src", `/hero-${region}-collage.webp`);
+    await expect(page.locator(".regional-note-start")).toBeHidden();
+    await expect(page.locator(".regional-note-end")).toBeHidden();
     await expect.poll(() => artwork.evaluate(element => {
       const image = element as HTMLImageElement;
       return image.complete && image.naturalWidth > 0 && image.currentSrc.startsWith("data:image/gif");
@@ -209,6 +211,86 @@ test("phones avoid downloading decorative regional artwork after language switch
     await artwork.evaluate(element => (element as HTMLImageElement).decode());
     expect(artworkRequests).toEqual([]);
   }
+});
+
+test("regional photo collages and handwritten notes fit desktop layouts and larger text", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop"), "Desktop collage layout coverage");
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  const failedArtworkResponses: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  page.on("response", response => {
+    if (/hero-(?:uzbekistan|united-kingdom)-collage\.webp/.test(response.url()) && !response.ok() && response.status() !== 304) {
+      failedArtworkResponses.push(`${response.status()} ${response.url()}`);
+    }
+  });
+  const notes = {
+    uz: {
+      start: ["Ko‘proq", "kontekst —", "kamroq", "manipulyatsiya"],
+      end: ["Faktlarni tekshiring.", "Tanqidiy fikrlang.", "Mas’uliyat bilan ulashing."],
+    },
+    en: {
+      start: ["More", "context —", "less", "manipulation"],
+      end: ["Check facts.", "Think critically.", "Share responsibly."],
+    },
+  };
+
+  for (const width of [1024, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("/");
+    for (const size of ["normal", "larger"] as const) {
+      await page.locator(".site-footer .text-size-control button").nth(size === "normal" ? 0 : 2).click();
+      await expect(page.locator("html")).toHaveAttribute("data-text-size", size);
+      await page.goto("/");
+      for (const locale of ["uz", "en"] as const) {
+        await changeLanguage(page, locale);
+        await page.evaluate(() => document.fonts.ready);
+        const artwork = page.locator(".regional-artwork");
+        const image = artwork.locator("img.regional-collage");
+        const region = locale === "uz" ? "uzbekistan" : "united-kingdom";
+        await expect(image).toBeVisible();
+        await expect(image).toHaveAttribute("src", `/hero-${region}-collage.webp`);
+        await image.evaluate(element => (element as HTMLImageElement).decode());
+        expect(await image.evaluate(element => ({
+          loaded: (element as HTMLImageElement).complete && (element as HTMLImageElement).naturalWidth > 0,
+          fit: getComputedStyle(element).objectFit,
+        }))).toEqual({ loaded: true, fit: "contain" });
+        await expect(artwork.locator(".regional-note-start")).toBeVisible();
+        await expect(artwork.locator(".regional-note-end")).toBeVisible();
+        await expect(artwork.locator(".regional-note-start span.block")).toHaveText(notes[locale].start);
+        await expect(artwork.locator(".regional-note-end span.block")).toHaveText(notes[locale].end);
+        for (const selector of [".regional-hero", ".analyzer-grid"]) {
+          expect(await page.locator(selector).evaluate(element =>
+            getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,
+          )).toBe(2);
+        }
+        const geometry = await artwork.evaluate(element => {
+          const bounds = element.getBoundingClientRect();
+          const start = element.querySelector(".regional-note-start")!.getBoundingClientRect();
+          const end = element.querySelector(".regional-note-end")!.getBoundingClientRect();
+          return {
+            notesWithinArtwork: [start, end].every(note =>
+              note.left >= bounds.left - 1 && note.top >= bounds.top - 1 &&
+              note.right <= bounds.right + 1 && note.bottom <= bounds.bottom + 1,
+            ),
+            notesOverlap: start.left < end.right && start.right > end.left && start.top < end.bottom && start.bottom > end.top,
+          };
+        });
+        expect(geometry, `${locale}: ${width}px, ${size} text`).toEqual({
+          notesWithinArtwork: true, notesOverlap: false,
+        });
+        const credit = page.locator(".regional-artwork-credit");
+        await expect(credit.locator('a[href^="https://commons.wikimedia.org/wiki/File:"]')).toHaveCount(1);
+        await expect(credit.locator('a[href^="https://creativecommons.org/"]')).toHaveCount(1);
+        await expect(credit).toContainText(/AI/);
+        await expectNoOverflow(page);
+        await page.screenshot({ path: join(tmpdir(), `rufact-collage-${locale}-${width}-${size}.png`) });
+      }
+    }
+  }
+  expect(failedArtworkResponses).toEqual([]);
+  expect(errors).toEqual([]);
 });
 
 test("all regional themes and mobile menus fit 320px and 412px phones", async ({ page }, testInfo) => {

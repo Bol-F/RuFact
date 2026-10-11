@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { REGIONAL_ARTWORK } from "@/lib/regional-artwork";
 
 import { Brand } from "./Brand";
 import { useFeedback } from "./FeedbackProvider";
@@ -9,7 +10,8 @@ import { TextSizeControl } from "./TextSizeControl";
 
 export function Footer() {
   const { openFeedback } = useFeedback();
-  const { copy } = useLanguage();
+  const { locale, copy } = useLanguage();
+  const artwork = locale === "ru" ? null : REGIONAL_ARTWORK[locale];
 
   return (
     <footer className="site-footer content-gutter pb-3 pt-1 sm:pb-6 sm:pt-2">
@@ -22,6 +24,13 @@ export function Footer() {
           <p className="mt-2 text-[0.65625rem] leading-[1.5] text-[#b9c8d4]">
             {copy.footer.tagline}
           </p>
+          {artwork ? (
+            <p className="regional-artwork-credit mt-2 max-w-[420px] text-[0.65625rem] leading-[1.5] text-[#b9c8d4]">
+              {artwork.credit}: <a className="focus-ring rounded underline underline-offset-2" href={artwork.source} target="_blank" rel="noopener noreferrer">{artwork.author}</a>
+              {" · "}<a className="focus-ring rounded underline underline-offset-2" href={artwork.licenseUrl} target="_blank" rel="noopener noreferrer">{artwork.license}</a>
+              <br />{artwork.adaptation}
+            </p>
+          ) : null}
         </div>
         <nav aria-label={copy.footer.navigation}>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[0.65625rem] font-bold text-[#dbe4eb]">
