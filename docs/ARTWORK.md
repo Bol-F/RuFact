@@ -21,9 +21,12 @@ The two final asset prompts used the following shared brief, substituting the lo
 
 Mode: built-in `image_gen`, not CLI. All final assets are stored in `public/`, not referenced from a user's home directory.
 
-## Rendering and mobile performance
+## Shared design and mobile performance
 
-- Both regional desktop heroes use a split layout and `object-fit: contain` so the collage and tall buildings are not cropped.
-- Below 768px, the artwork and handwritten notes are hidden. A `<picture>` media source supplies a tiny inline GIF instead of downloading a decorative WebP.
+- Uzbek, Russian, and English share the Russian visual design: navy with copper-orange accents, warm textured paper, a rounded shell, a transparent header, and the same hero, typography, controls, and card family. There are no locale-specific palettes or interface geometries.
+- Copy, handwritten annotations, and collage locations remain localised: Samarkand for Uzbek, Moscow for Russian, and Westminster for English. All three heroes use the same responsive layout and `object-fit: contain` so the collage and tall buildings are not cropped.
+- The desktop editor and result panels have aligned top edges. On phones, they stack in one column.
+- Below 768px, artwork and handwritten notes are hidden for all three languages. A `<picture>` media source supplies a tiny inline GIF instead of downloading the decorative asset.
 - No remote image host or extra client-side image request is required by the application. Source and licence URLs are ordinary external attribution links.
-- English uses `en-GB`; changing locale does not reset analyzer drafts, results, or conversation state.
+- English uses `en-GB`; changing locale does not reset analyzer drafts, results, or conversation state. The APIs and source-verification pipeline are unchanged.
+- Uzbek and English retain a neutral initial result prompt, not an invented verdict or accuracy claim. The shared visual design does not expand the Russian ML model's measured accuracy to other languages.

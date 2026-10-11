@@ -3,7 +3,7 @@ import { Caveat, Lora, Manrope } from "next/font/google";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
-import "./regional-themes.css";
+import "./shared-ui.css";
 
 const lora = Lora({
   variable: "--font-lora",

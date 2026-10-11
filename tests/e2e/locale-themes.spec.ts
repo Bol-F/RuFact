@@ -35,7 +35,31 @@ async function expectNoOverflow(page: Page) {
   )).toBe(true);
 }
 
-test("language changes switch regional designs without losing the analyzer draft", async ({ page }, testInfo) => {
+async function expectPanelLayout(page: Page, desktop: boolean) {
+  await expect.poll(() => page.evaluate(isDesktop => {
+    const input = document.querySelector(".text-analyzer")!.getBoundingClientRect();
+    const result = document.querySelector(".analysis-result")!.getBoundingClientRect();
+    return isDesktop
+      ? Math.abs(input.top - result.top) <= 1
+      : result.top >= input.bottom - 1;
+  }, desktop)).toBe(true);
+}
+
+async function sharedPresentation(page: Page) {
+  const surfaces = {
+    shell: { selector: ".paper-shell", properties: ["background-color", "border-radius", "border-color", "box-shadow"] },
+    header: { selector: ".site-header", properties: ["background-color", "color", "padding-left", "padding-right"] },
+    card: { selector: ".text-analyzer", properties: ["background-color", "border-radius", "border-color", "box-shadow", "padding"] },
+    submit: { selector: ".analyzer-submit", properties: ["background-color", "border-radius", "color", "font-family", "font-size", "font-weight"] },
+    title: { selector: "#hero-heading", properties: ["color", "font-family", "font-size", "font-weight", "letter-spacing", "line-height", "text-align"] },
+  };
+  return page.evaluate(definitions => Object.fromEntries(Object.entries(definitions).map(([name, definition]) => {
+    const style = getComputedStyle(document.querySelector(definition.selector)!);
+    return [name, Object.fromEntries(definition.properties.map(property => [property, style.getPropertyValue(property)]))];
+  })), surfaces);
+}
+
+test("language changes keep the shared Russian presentation without losing the analyzer draft", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
@@ -80,6 +104,30 @@ test("language changes switch regional designs without losing the analyzer draft
     expect(uzbekColumns).toBe(2);
   }
   await page.screenshot({ path: join(tmpdir(), `rufact-theme-uz-${testInfo.project.name}.png`) });
+  expect(errors).toEqual([]);
+});
+
+test("all languages share the Russian shell, cards, buttons and hero typography", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  await page.goto("/");
+  await changeLanguage(page, "ru");
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator(".site-hero")).toBeVisible();
+  const russianPresentation = await sharedPresentation(page);
+  for (const locale of ["uz", "en", "ru"] as const) {
+    await changeLanguage(page, locale);
+    await expect(page.locator(".site-hero")).toBeVisible();
+    expect(await sharedPresentation(page), `${locale} uses shared Russian styles`).toEqual(russianPresentation);
+    await expectPanelLayout(page, testInfo.project.name.startsWith("desktop"));
+    await expectNoOverflow(page);
+  }
+  const frameworkPortal = page.locator("nextjs-portal");
+  const overlay = await frameworkPortal.count()
+    ? await frameworkPortal.evaluate(element => element.shadowRoot?.textContent ?? "")
+    : "";
+  expect(overlay).not.toMatch(/Build Error|Runtime Error/);
   expect(errors).toEqual([]);
 });
 
@@ -146,10 +194,11 @@ test("theme switching remains usable when browser preference storage is blocked"
   expect(errors).toEqual([]);
 });
 
-test("language switches retain in-flight and completed analyzer results", async ({ page }) => {
+test("language switches retain aligned in-flight and completed analyzer results", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   const requests: { text: string; locale: string }[] = [];
   let release!: () => void;
-  const pending = new Promise<void>(resolve => { release = resolve; });
+  let pending: Promise<void>;
   await page.route("**/api/analyze", async route => {
     requests.push(route.request().postDataJSON());
     await pending;
@@ -159,32 +208,54 @@ test("language switches retain in-flight and completed analyzer results", async 
       meta: { engine: "external-model", engineVersion: "theme-regression-v1", externalSourcesChecked: false },
     } });
   });
-  await page.goto("/");
-  const draft = "Toshkent — O‘zbekiston poytaxti.";
-  const input = page.locator("#analysis-text");
-  await input.fill(draft);
-  await page.locator(".analyzer-submit").click();
-  try {
-    await expect.poll(() => requests.length).toBe(1);
-    expect(requests[0]).toMatchObject({ text: draft, locale: "uz" });
-    await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "true");
-    await changeLanguage(page, "en");
-    await expect(input).toHaveValue(draft);
-    await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "true");
-  } finally {
-    release();
-  }
-  const result = page.locator('.analysis-result section[aria-label$=": REAL"]');
-  await expect(result).toBeVisible();
-  await expect(result).toContainText("83%");
-  for (const locale of ["ru", "uz", "en"] as const) {
-    await changeLanguage(page, locale);
-    await expect(input).toHaveValue(draft);
+  const desktop = testInfo.project.name.startsWith("desktop");
+  const widths = desktop ? [1024, 1440] : [412];
+  for (const [round, width] of widths.entries()) {
+    await page.setViewportSize({ width, height: 1000 });
+    pending = new Promise<void>(resolve => { release = resolve; });
+    await page.goto("/");
+    for (const locale of ["ru", "en", "uz"] as const) {
+      await changeLanguage(page, locale);
+      await expectPanelLayout(page, desktop);
+    }
+    const draft = "Toshkent — O‘zbekiston poytaxti.";
+    const input = page.locator("#analysis-text");
+    await input.fill(draft);
+    await page.locator(".analyzer-submit").click();
+    try {
+      await expect.poll(() => requests.length).toBe(round + 1);
+      expect(requests[round]).toMatchObject({ text: draft, locale: "uz" });
+      await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "true");
+      for (const locale of ["en", "ru", "uz"] as const) {
+        await changeLanguage(page, locale);
+        await expect(input).toHaveValue(draft);
+        await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "true");
+        await expectPanelLayout(page, desktop);
+      }
+    } finally {
+      release();
+    }
+    const result = page.locator('.analysis-result section[aria-label$=": REAL"]');
     await expect(result).toBeVisible();
     await expect(result).toContainText("83%");
-    await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "false");
+    const resultStyle = await page.locator(".analysis-result").evaluate(element => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, border: style.borderColor, radius: style.borderRadius, padding: style.padding, shadow: style.boxShadow };
+    });
+    for (const locale of ["ru", "uz", "en"] as const) {
+      await changeLanguage(page, locale);
+      await expect(input).toHaveValue(draft);
+      await expect(result).toBeVisible();
+      await expect(result).toContainText("83%");
+      await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "false");
+      await expectPanelLayout(page, desktop);
+      expect(await page.locator(".analysis-result").evaluate(element => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, border: style.borderColor, radius: style.borderRadius, padding: style.padding, shadow: style.boxShadow };
+      })).toEqual(resultStyle);
+    }
   }
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(widths.length);
 });
 
 test("phones avoid downloading decorative regional artwork after language switching", async ({ page }, testInfo) => {
@@ -260,7 +331,7 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
         await expect(artwork.locator(".regional-note-end")).toBeVisible();
         await expect(artwork.locator(".regional-note-start span.block")).toHaveText(notes[locale].start);
         await expect(artwork.locator(".regional-note-end span.block")).toHaveText(notes[locale].end);
-        for (const selector of [".regional-hero", ".analyzer-grid"]) {
+        for (const selector of [".site-hero", ".analyzer-grid"]) {
           expect(await page.locator(selector).evaluate(element =>
             getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,
           )).toBe(2);
@@ -284,6 +355,7 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
         await expect(credit.locator('a[href^="https://commons.wikimedia.org/wiki/File:"]')).toHaveCount(1);
         await expect(credit.locator('a[href^="https://creativecommons.org/"]')).toHaveCount(1);
         await expect(credit).toContainText(/AI/);
+        await expectPanelLayout(page, true);
         await expectNoOverflow(page);
         await page.screenshot({ path: join(tmpdir(), `rufact-collage-${locale}-${width}-${size}.png`) });
       }

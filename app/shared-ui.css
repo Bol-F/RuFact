@@ -1,0 +1,56 @@
+/* One Russian-derived design system; locale changes copy and artwork, not UI chrome. */
+.site-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 0;
+  min-height: 360px;
+  padding-block: 4px 12px;
+}
+
+.hero-heading {
+  font-size: 3.1875rem;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  overflow-wrap: break-word;
+}
+
+.hero-artwork { position: relative; min-width: 0; height: 360px; }
+.hero-picture { position: absolute; inset: 0 -12px; display: block; }
+.hero-collage { object-fit: contain; object-position: right bottom; }
+.hero-artwork[data-region="russia"] .hero-picture { top: -64px; right: -40px; }
+.hero-note { position: absolute; z-index: 1; font-size: 1.1875rem; line-height: 1.03; color: #66758c; pointer-events: none; }
+.hero-note-start { left: 11%; top: 2%; max-width: 38%; transform: rotate(-6deg); }
+.hero-note-end { right: 3%; top: 5%; max-width: 45%; transform: rotate(-4deg); }
+
+.result-empty-body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 390px; margin-top: 16px; padding: 24px; border-radius: 14px; background: #edf2f6; text-align: center; }
+.result-empty-icon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 18px; border-radius: 50%; background: #ffffff; color: var(--ink-deep); }
+.result-empty-body h3 { font-size: 1.625rem; font-weight: 600; line-height: 1.2; }
+.result-empty-body p { max-width: 310px; margin-top: 12px; color: #607087; font-size: 0.875rem; line-height: 1.65; }
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .site-hero { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-block: 12px 24px; }
+  .hero-heading { font-size: 3rem; line-height: 1.03; }
+  .hero-artwork { height: 290px; }
+  .hero-picture { inset: 0; }
+  .hero-artwork[data-region="russia"] .hero-picture { top: 0; right: 0; }
+}
+
+@media (max-width: 1023px) {
+  .hero-note { display: none; }
+}
+
+@media (max-width: 767px) {
+  .site-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; padding-block: 4px 12px; }
+  .hero-heading { font-size: 1.875rem; line-height: 1.01; }
+  .hero-artwork { display: none; }
+  .result-empty-body { min-height: 220px; padding: 20px; }
+  .result-empty-body h3 { font-size: 1.375rem; }
+  .result-empty-body p { font-size: 0.9375rem; }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .hero-heading { font-size: 2.625rem; line-height: 1.02; }
+  .hero-note { font-size: 1.125rem; }
+}

@@ -19,6 +19,8 @@ import { useLanguage } from "./LanguageProvider";
 
 export type AnalysisStatus = "initial" | "loading" | "success" | "error";
 
+const RESULT_CARD_CLASS = "analysis-result min-w-0 rounded-[16px] border border-white/70 bg-[rgba(255,248,246,0.91)] p-3.5 shadow-[0_12px_28px_rgba(59,40,34,0.09)] sm:rounded-[22px] sm:p-6 sm:pb-8 sm:shadow-[0_20px_42px_rgba(59,40,34,0.11)]";
+
 interface AnalysisResultProps {
   result: AnalysisResponse;
   analyzedText: string;
@@ -49,8 +51,11 @@ export function AnalysisResult({
   // Do not present an unrun multilingual preview as a factual verdict.
   if (status === "initial" && locale !== "ru") {
     return (
-      <article className="analysis-result result-empty" aria-live="polite">
-        <h2 className="font-serif">{copy.result.heading}</h2>
+      <article className={`${RESULT_CARD_CLASS} result-empty`} aria-live="polite">
+        <header className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[#e2edf6] text-[#285b87] sm:h-9 sm:w-9 sm:rounded-[11px]" aria-hidden="true"><SearchCheck size={18} strokeWidth={2} /></span>
+          <h2 className="min-w-0 break-words text-[0.75rem] font-extrabold text-[#112f4d] sm:text-[1rem]">{copy.result.heading}</h2>
+        </header>
         <div className="result-empty-body">
           <span className="result-empty-icon" aria-hidden="true"><SearchCheck size={36} strokeWidth={1.6} /></span>
           <h3 className="font-serif">{copy.analyzer.submit}</h3>
@@ -68,10 +73,10 @@ export function AnalysisResult({
       transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
       aria-live="polite"
       aria-busy={status === "loading"}
-      className="analysis-result rounded-[16px] border border-white/70 bg-[rgba(255,248,246,0.91)] p-3.5 shadow-[0_12px_28px_rgba(59,40,34,0.09)] sm:rounded-[22px] sm:p-6 sm:pb-8 sm:shadow-[0_20px_42px_rgba(59,40,34,0.11)]"
+      className={RESULT_CARD_CLASS}
     >
-      <header className="flex items-center justify-between gap-2 sm:gap-4">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+        <div className="flex min-w-0 flex-1 basis-[12rem] items-center gap-2 sm:gap-3">
           <span
             className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] sm:h-9 sm:w-9 sm:rounded-[11px] ${
               isFake ? "bg-[#ffe6e3] text-[#d63b43]" : "bg-[#e0eee2] text-[#34794b]"
@@ -83,11 +88,11 @@ export function AnalysisResult({
               <CheckCircle2 size={18} strokeWidth={2} aria-hidden="true" />
             )}
           </span>
-          <h2 className="truncate text-[0.75rem] font-extrabold text-[#112f4d] sm:text-[1rem]">
+          <h2 className="min-w-0 break-words text-[0.75rem] font-extrabold text-[#112f4d] sm:text-[1rem]">
             {copy.result.heading}
           </h2>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
           <span
             className={`rounded-md px-1.5 py-0.5 text-[0.46875rem] font-extrabold uppercase tracking-[0.07em] sm:px-2 sm:py-1 sm:text-[0.5625rem] ${
               isDemo
@@ -151,10 +156,10 @@ export function AnalysisResult({
             transition={{ duration: 0.28 }}
           >
             <section
-              className={`mt-2.5 grid grid-cols-[1fr_auto] items-center gap-2 rounded-[12px] border px-3 py-2.5 sm:mt-3 sm:gap-5 sm:rounded-[15px] sm:px-4 sm:py-3.5 ${panelClass}`}
+              className={`mt-2.5 flex flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2.5 sm:mt-3 sm:gap-5 sm:rounded-[15px] sm:px-4 sm:py-3.5 ${panelClass}`}
               aria-label={`${copy.result.resultAria}: ${result.label}`}
             >
-              <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
+              <div className="flex min-w-0 flex-1 basis-[9rem] items-center gap-2.5 sm:basis-[12rem] sm:gap-4">
                 <span
                   className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] sm:h-11 sm:w-11 sm:rounded-[12px] ${
                     isFake ? "bg-[#f5c8c8] text-[#c63840]" : "bg-[#cfe4d2] text-[#347a4d]"
@@ -183,7 +188,9 @@ export function AnalysisResult({
                 </div>
               </div>
 
-              <ConfidenceRing value={result.confidence} label={copy.result.confidence} tone={tone} />
+              <div className="mx-auto shrink-0">
+                <ConfidenceRing value={result.confidence} label={copy.result.confidence} tone={tone} />
+              </div>
             </section>
 
             {result.geminiReview ? (

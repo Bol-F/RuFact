@@ -244,7 +244,7 @@ function AnalyzerWorkspaceSession({
           onUseGeminiChange={setUseGemini}
         />
 
-        <div className="analyzer-result-slot lg:-mt-[72px] xl:-mt-[104px]">
+        <div className="analyzer-result-slot min-w-0">
           <AnalysisResult
             result={result ?? initialResult}
             analyzedText={analyzedText ?? initialExample.text}

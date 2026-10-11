@@ -3,12 +3,12 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import { ArrowDown, ArrowUpRight, MessageCircle } from "lucide-react";
 import { chatCopy } from "@/lib/chat-copy";
+import { REGIONAL_ARTWORK } from "@/lib/regional-artwork";
 
 import { MODEL_QUALITY } from "@/lib/model-quality";
 import { useLanguage } from "./LanguageProvider";
-import { RegionalHero } from "./RegionalHero";
 
 const enter = {
   hidden: { opacity: 0, y: 16 },
@@ -19,19 +19,21 @@ export function Hero() {
   const accuracy = MODEL_QUALITY.metrics.find((metric) => metric.key === "accuracy")?.value;
   const { locale, copy } = useLanguage();
 
-  if (locale !== "ru") return <RegionalHero />;
+  const artwork = locale === "ru" ? null : REGIONAL_ARTWORK[locale];
+  const region = locale === "ru" ? "russia" : locale === "uz" ? "uzbekistan" : "united-kingdom";
 
   return (
     <section
       id="how-it-works"
       aria-labelledby="hero-heading"
-      className="content-gutter relative grid gap-1 pb-3 pt-1 sm:min-h-[310px] sm:gap-5 sm:pb-9 sm:pt-3 lg:min-h-[286px] lg:grid-cols-[minmax(620px,1fr)_minmax(0,1fr)] lg:gap-0 lg:pb-0 lg:pt-0"
+      data-region={region}
+      className={`site-hero content-gutter${artwork ? " regional-hero" : ""}`}
     >
       <motion.div
         initial="hidden"
         animate="visible"
         transition={{ staggerChildren: 0.08, delayChildren: 0.05 }}
-        className="relative z-10 max-w-[655px]"
+        className="hero-copy relative z-10 min-w-0"
       >
         <motion.p
           variants={enter}
@@ -45,21 +47,17 @@ export function Hero() {
           id="hero-heading"
           variants={enter}
           transition={{ duration: 0.5 }}
-          className="max-w-[680px] font-serif text-[1.875rem] leading-[1.01] font-semibold tracking-[-0.045em] text-ink sm:text-[3rem] sm:leading-[1.03] lg:text-[3.1875rem] lg:leading-[0.96]"
+          className="hero-heading font-serif font-semibold text-ink"
         >
-          <span className="sm:hidden">
+          <span className="md:hidden">
             {copy.hero.mobileTitleStart}
             <br />
             <span className="text-[#c9421e]">{copy.hero.mobileTitleAccent}</span>
           </span>
-          <span className="hidden sm:inline">
-            {copy.hero.desktopLine1}
-            <br />
-            <span className="whitespace-nowrap">
-              <span className="text-[#c9421e]">{copy.hero.desktopLine2}</span>
-            </span>
-            <br />
-            <span className="text-[#c9421e]">{copy.hero.desktopLine3}</span>
+          <span className="hidden md:inline">
+            <span className="block">{copy.hero.desktopLine1}</span>
+            <span className="block text-[#c9421e]">{copy.hero.desktopLine2}</span>
+            <span className="block text-[#c9421e]">{copy.hero.desktopLine3}</span>
           </span>
         </motion.h1>
 
@@ -68,16 +66,16 @@ export function Hero() {
           transition={{ duration: 0.5 }}
           className="mt-2 max-w-[615px] text-[0.75rem] leading-[1.45] text-[#607087] sm:mt-3 sm:text-[1rem] sm:leading-[1.52]"
         >
-          <span className="sm:hidden">
+          <span className="md:hidden">
             {copy.hero.mobileDescription}
           </span>
-          <span className="hidden sm:inline">
+          <span className="hidden md:inline">
             {copy.hero.desktopDescription}{locale === "ru" ? ` Русская ML-модель показала ${Math.round((accuracy ?? 0) * 100)}% accuracy на отдельной внешней выборке.` : ""}
           </span>
         </motion.p>
         <div className="relative mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
-          <Link href="/#analyzer" className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-ink px-4 text-sm font-semibold text-white">{chatCopy[locale].check} ↓</Link>
-          <Link href="/chat" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#cbd8d0] bg-white/70 px-4 text-sm font-semibold"><MessageCircle size={17} />{chatCopy[locale].open} ↗</Link>
+          <Link href="/#analyzer" className="hero-primary focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-semibold text-white">{chatCopy[locale].check}<ArrowDown size={16} aria-hidden="true" /></Link>
+          <Link href="/chat" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#cbd8d0] bg-white/70 px-4 text-sm font-semibold"><MessageCircle size={17} aria-hidden="true" />{chatCopy[locale].open}<ArrowUpRight size={16} aria-hidden="true" /></Link>
         </div>
       </motion.div>
 
@@ -85,21 +83,23 @@ export function Hero() {
         initial={{ opacity: 0, x: 18 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.7, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-        className="relative -mx-4 hidden min-h-[280px] sm:block lg:-mr-[46px] lg:-ml-24 lg:min-h-[286px]"
+        data-region={region}
+        className={`hero-artwork${artwork ? " regional-artwork" : ""}`}
       >
-        <div className="absolute inset-x-0 bottom-[-2px] top-[-38px] sm:bottom-[-6px] sm:top-[-110px]">
+        <picture className="hero-picture">
+          <source media="(max-width: 767px)" srcSet="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" />
           <Image
-            src="/hero-collage.png"
-            alt={copy.hero.imageAlt}
+            src={artwork?.src ?? "/hero-collage.png"}
+            alt={artwork ? "" : copy.hero.imageAlt}
             fill
             loading="eager"
             fetchPriority="high"
-            sizes="(max-width: 1024px) 100vw, 58vw"
-            className="object-contain object-right-bottom"
+            sizes="(max-width: 1023px) 92vw, 640px"
+            className={`hero-collage${artwork ? " regional-collage" : ""}`}
           />
-        </div>
+        </picture>
 
-        <div className="font-hand absolute left-[11%] top-[-2%] hidden -rotate-6 text-[1.1875rem] leading-[0.95] text-[#7b879a] xl:block">
+        <div className={`hero-note hero-note-start font-hand${artwork ? " regional-note regional-note-start" : ""}`} aria-hidden="true">
           {copy.hero.noteLeft.split("\n").map((line) => <span className="block" key={line}>{line}</span>)}
           <svg
             width="68"
@@ -114,7 +114,7 @@ export function Hero() {
           </svg>
         </div>
 
-        <div className="font-hand absolute right-[5%] top-[1%] hidden rotate-[-4deg] text-[1.125rem] leading-[1.04] text-[#66758c] xl:block">
+        <div className={`hero-note hero-note-end font-hand${artwork ? " regional-note regional-note-end" : ""}`} aria-hidden="true">
           {copy.hero.noteRight.split("\n").map((line) => <span className="block" key={line}>{line}</span>)}
           <span className="mt-2 block h-px w-14 -rotate-6 bg-[#d6693a]" />
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Bot, Database, SearchCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, BrainCircuit, SearchCheck, ShieldAlert } from "lucide-react";
 
 import { MODEL_QUALITY } from "@/lib/model-quality";
 import { InfoCards } from "./InfoCards";
@@ -43,6 +43,12 @@ const multilingualCopy = {
   },
 } as const;
 
+const stagePresentation = [
+  { icon: BrainCircuit, iconClass: "bg-[#dceaf3] text-[#285e7d]", lineClass: "bg-[#7ca5bd]" },
+  { icon: SearchCheck, iconClass: "bg-[#f6e1d1] text-[#b15432]", lineClass: "bg-[#dc8a5d]" },
+  { icon: Bot, iconClass: "bg-[#dcebdc] text-[#37724d]", lineClass: "bg-[#6b9c78]" },
+] as const;
+
 export function ModelPageContent() {
   const { locale } = useLanguage();
 
@@ -68,40 +74,50 @@ export function ModelPageContent() {
   }
 
   const copy = multilingualCopy[locale];
-  const icons = [Bot, SearchCheck, Database] as const;
 
   return (
     <>
-      <section aria-labelledby="model-page-heading" className="regional-model-intro content-gutter pb-5 pt-4 sm:pb-8 sm:pt-7">
+      <section aria-labelledby="model-page-heading" className="regional-model-intro content-gutter pb-2 pt-4 sm:pb-3 sm:pt-7">
         <Link href="/#analyzer" className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d7d8d3] bg-[#fbfaf6]/80 px-3.5 text-[0.75rem] font-bold text-[#486177] transition-colors hover:bg-white hover:text-ink">
           <ArrowLeft size={15} strokeWidth={2} aria-hidden="true" />
           {copy.back}
         </Link>
-        <div className="regional-model-lead mt-5 max-w-[780px] sm:mt-7">
-          <h1 id="model-page-heading" className="font-serif text-[2.25rem] leading-[1.03] font-semibold tracking-[-0.045em] text-ink sm:text-[3.125rem]">{copy.title}</h1>
-          <p className="mt-3 text-[0.875rem] leading-[1.65] text-[#607087] sm:text-[1rem]">{copy.intro}</p>
+        <div className="regional-model-lead mt-5 max-w-[760px] sm:mt-7">
+          <h1 id="model-page-heading" className="font-serif text-[2.375rem] leading-[1.02] font-semibold tracking-[-0.045em] text-ink sm:text-[3.125rem]">{copy.title}</h1>
+          <p className="mt-3 text-[0.875rem] leading-[1.65] text-[#607087] sm:max-w-[700px] sm:text-[1rem]">{copy.intro}</p>
         </div>
       </section>
 
-      <section className="regional-model-architecture tool-gutter pb-6" aria-labelledby="architecture-heading">
-        <h2 id="architecture-heading" className="font-serif text-[1.75rem] font-semibold text-ink sm:text-[2.25rem]">{copy.architecture}</h2>
-        <div className="regional-model-stages mt-4 grid gap-3 lg:grid-cols-3">
-          {copy.stages.map((stage, index) => {
-            const Icon = icons[index];
-            return (
-              <article key={stage.title} className="regional-model-stage rounded-[18px] border border-[#d9ddd9] bg-white/55 p-5 shadow-[0_10px_28px_rgba(21,45,63,0.05)]">
-                <div className="regional-model-stage-marker flex items-center justify-between gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e5eef2] text-[#315f78]"><Icon size={20} aria-hidden="true" /></span>
-                  <span className="regional-model-stage-number text-sm font-bold tabular-nums text-[#778694]" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                </div>
-                <div className="regional-model-stage-copy min-w-0">
-                  <h3 className="mt-4 text-[1rem] font-extrabold text-[#173552]">{stage.title}</h3>
-                  <p className="mt-2 text-[0.75rem] leading-[1.6] text-[#647589]">{stage.description}</p>
-                  <p className="regional-model-stage-detail mt-4 border-t border-[#e1e3df] pt-3 text-[0.625rem] font-bold text-[#778694]">{stage.detail}</p>
-                </div>
-              </article>
-            );
-          })}
+      <section className="regional-model-architecture tool-gutter pb-7 pt-5" aria-labelledby="architecture-heading">
+        <div className="overflow-hidden rounded-[22px] border border-[#d3d9d8] bg-[#fbfaf6]/90 shadow-[0_14px_34px_rgba(24,41,55,0.045)]">
+          <div className="border-b border-[#dddeda] px-6 py-6 sm:px-8 sm:py-7">
+            <h2 id="architecture-heading" className="font-serif text-[1.8125rem] leading-[1.08] font-semibold tracking-[-0.035em] text-ink sm:text-[2.25rem]">{copy.architecture}</h2>
+          </div>
+          <div className="regional-model-stages grid lg:grid-cols-3">
+            {copy.stages.map((stage, index) => {
+              const presentation = stagePresentation[index];
+              const Icon = presentation.icon;
+              return (
+                <article key={stage.title} className="regional-model-stage relative min-w-0 border-b border-[#dddeda] px-6 py-7 last:border-b-0 sm:px-8 lg:border-b-0 lg:border-r lg:last:border-r-0">
+                  <div className="regional-model-stage-marker flex items-start justify-between gap-4">
+                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[13px] ${presentation.iconClass}`}><Icon size={22} strokeWidth={1.9} aria-hidden="true" /></span>
+                    <span className="regional-model-stage-number font-serif text-[1.5625rem] font-semibold text-[#ccd2d2]" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+                  <div className={`mt-5 h-0.5 w-10 rounded-full ${presentation.lineClass}`} aria-hidden="true" />
+                  <div className="regional-model-stage-copy min-w-0">
+                    <h3 className="mt-4 text-[1.0625rem] font-extrabold tracking-[-0.02em] text-[#173b59]">{stage.title}</h3>
+                    <p className="mt-3 text-[0.75rem] leading-[1.6] text-[#667586]">{stage.description}</p>
+                    <p className="regional-model-stage-detail mt-4 text-[0.625rem] font-bold leading-[1.45] text-[#82909b]">{stage.detail}</p>
+                  </div>
+                  {index < copy.stages.length - 1 ? (
+                    <span className="absolute -right-3 top-1/2 z-10 hidden h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-[#d6dcda] bg-[#fbfaf6] text-[#7b8a91] lg:grid" aria-hidden="true">
+                      <ArrowRight size={13} strokeWidth={2} />
+                    </span>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 
