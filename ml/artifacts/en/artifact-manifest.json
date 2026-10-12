@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "filename": "model.joblib",
+  "language": "en",
+  "modelVersion": "tfidf-word-char-logreg-en-v1",
+  "sha256": "f9bdc8f6e07e1147e8a12a4519e889d62f0297af744ddaab333254b1ea1d6515",
+  "bytes": 1033079,
+  "sklearnVersion": "1.9.1"
+}

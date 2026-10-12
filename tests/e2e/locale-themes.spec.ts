@@ -154,8 +154,8 @@ test("Uzbek teal and English navy-copper colors apply to the shared hero and con
   await expect(page.locator(".analyzer-submit")).not.toHaveCSS("background-image", "none");
   await page.getByRole("button", { name: "Новость", exact: true }).click();
   await page.locator(".analyzer-submit").click();
-  await expect(page.locator('.analysis-result section[aria-label$=": FAKE"]')).toBeVisible();
-  await expect(page.locator('.analysis-result section[aria-label$=": FAKE"] p').first()).toHaveCSS("color", "rgb(199, 53, 60)");
+  await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"]')).toBeVisible();
+  await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"] p').first()).toHaveCSS("color", "rgb(199, 53, 60)");
 });
 
 test("selected regional design persists through model and chat navigation and reload", async ({ page }) => {
@@ -266,7 +266,7 @@ test("language switches retain aligned in-flight and completed analyzer results"
     } finally {
       release();
     }
-    const result = page.locator('.analysis-result section[aria-label$=": REAL"]');
+    const result = page.locator('.analysis-result section[data-verdict-label="REAL"]');
     await expect(result).toBeVisible();
     await expect(result).toContainText("83%");
     const resultStyle = await page.locator(".analysis-result").evaluate(element => {
@@ -322,7 +322,7 @@ test("enlarged text keeps narrow desktop verdicts and result headings readable",
   await expectNoOverflow(page);
   await page.locator("#analysis-text").fill("Toshkent is the capital of Uzbekistan.");
   await page.locator(".analyzer-submit").click();
-  await expect(page.locator('.analysis-result section[aria-label$=": REAL"]')).toBeVisible();
+  await expect(page.locator('.analysis-result section[data-verdict-label="REAL"]')).toBeVisible();
   for (const locale of ["ru", "uz", "en"] as const) {
     await changeLanguage(page, locale);
     await expectReadableResult();

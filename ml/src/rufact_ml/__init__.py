@@ -1,4 +1,4 @@
-"""RuFact's Russian-language text classification service."""
+"""RuFact's Russian and English statistical text classification service."""
 
 MODEL_VERSION = "tfidf-word-char-logreg-ru-v2"
 

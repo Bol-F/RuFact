@@ -54,8 +54,8 @@ test("builds a plain-text report with claims and safety wording", () => {
     },
   });
 
-  assert.match(report, /Результат: FAKE/u);
-  assert.match(report, /Уверенность модели в этом ответе: 72%/u);
+  assert.match(report, /Результат: НЕЯСНО/u);
+  assert.doesNotMatch(report, /Уверенность модели в этом ответе: 72%/u);
   assert.match(report, /Проверяемое утверждение/u);
   assert.match(report, /FACTUAL \/ UNVERIFIED/u);
   assert.match(report, /Официальный источник/u);

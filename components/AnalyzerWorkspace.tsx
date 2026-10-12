@@ -165,12 +165,15 @@ function AnalyzerWorkspaceSession({
         source: "user",
         status: "success",
         text: normalizedText,
-        label: nextResult.label,
-        confidence: nextResult.confidence,
+        // Source conclusions and their evidence are not retained by compact local history.
+        // Do not later turn a source contradiction into the underlying ML REAL score.
+        label: nextResult.geminiReview?.status === "complete" ? "UNSURE" : nextResult.label,
+        confidence: nextResult.geminiReview?.status === "complete" ? 0 : nextResult.confidence,
         analyzedAt,
         meta: {
-          engine: nextResult.meta?.engine ?? "external-model",
-          version: nextResult.meta?.engineVersion ?? "external-api",
+          engine: nextResult.geminiReview?.status === "complete" ? "unavailable" : nextResult.meta?.engine ?? "external-model",
+          version: nextResult.geminiReview?.status === "complete" ? "source-review-not-retained" : nextResult.meta?.engineVersion ?? "external-api",
+          ...(nextResult.meta?.language ? { language: nextResult.meta.language } : {}),
         },
       });
     } catch {
@@ -187,12 +190,13 @@ function AnalyzerWorkspaceSession({
       item.meta.engine === "demo-heuristic"
         ? getMockAnalysis(item.text)
         : {
-            label: item.label,
-            confidence: item.confidence,
+            label: item.meta.language ? item.label : "UNSURE",
+            confidence: item.meta.language ? item.confidence : 0,
             meta: {
-              engine: item.meta.engine,
+              engine: item.meta.language ? item.meta.engine : "unavailable",
               engineVersion: item.meta.version,
               externalSourcesChecked: false,
+              ...(item.meta.language ? { language: item.meta.language } : {}),
             },
           };
 

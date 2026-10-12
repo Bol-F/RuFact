@@ -8,13 +8,14 @@ import { InfoCards } from "./InfoCards";
 import { ModelEvaluationDetails } from "./ModelEvaluationDetails";
 import { ModelSystemOverview } from "./ModelSystemOverview";
 import { ModelTransparency } from "./ModelTransparency";
+import { EnglishModelQuality } from "./EnglishModelQuality";
 import { useLanguage } from "./LanguageProvider";
 
 const multilingualCopy = {
   uz: {
     back: "Matn tekshiruviga qaytish",
     title: "RuFact tekshiruv tizimi haqida",
-    intro: "RuFact uch bosqichni birlashtiradi: rus tili uchun statistik ML tahlili, Tavily orqali internet manbalarini qidirish va Gemini orqali da’volarni manbalar bilan solishtirish.",
+    intro: "RuFact uch bosqichni birlashtiradi: rus va ingliz tillari uchun statistik ML tahlili, Tavily orqali internet manbalarini qidirish va Gemini orqali da’volarni manbalar bilan solishtirish.",
     architecture: "Tizim qanday ishlaydi",
     stages: [
       { title: "Ruscha ML modeli", description: "So‘z va belgilar TF-IDF modeli faqat ruscha korpusda o‘qitilgan. U uslubiy belgilarni baholaydi, faktlarni tekshirmaydi.", detail: `${MODEL_QUALITY.dataset.samples} ta ruscha tashqi baholash matni` },
@@ -22,14 +23,14 @@ const multilingualCopy = {
       { title: "Gemini tahlili", description: "Matndagi da’volarni ajratadi va faqat Tavily topgan parchalar bilan solishtiradi. Javob tanlangan tilda qaytariladi.", detail: "Tasdiqlangan · rad etilgan · noaniq" },
     ],
     accuracyTitle: "Aniqlik haqida muhim eslatma",
-    accuracy: `Ruscha ML modelining tashqi accuracy ko‘rsatkichi ${Math.round((MODEL_QUALITY.metrics.find((item) => item.key === "accuracy")?.value ?? 0) * 100)}%. Bu raqam o‘zbek yoki ingliz matnlariga tegishli emas. Ushbu tillarda internet manbalari tekshiruvi asosiy signal hisoblanadi.`,
+    accuracy: `Ruscha ML modelining tashqi accuracy ko‘rsatkichi ${Math.round((MODEL_QUALITY.metrics.find((item) => item.key === "accuracy")?.value ?? 0) * 100)}%. Bu raqam ingliz yoki o‘zbek matnlariga tegishli emas. Inglizcha modelning alohida test natijalari quyida ko‘rsatilgan. Manbalar tekshiruvi xulosasi ustun turadi.`,
     limitationsTitle: "Cheklovlar",
     limitations: ["Internetda manba topilmasligi da’vo yolg‘onligini isbotlamaydi.", "Gemini xato qilishi yoki manbadagi kontekstni noto‘g‘ri talqin qilishi mumkin.", "Muhim qarorlar uchun asl hujjat va bir nechta mustaqil manbani ochib tekshiring."],
   },
   en: {
     back: "Back to text checking",
     title: "About the RuFact verification system",
-    intro: "RuFact combines three stages: statistical ML analysis for Russian, internet source search through Tavily, and claim-to-source comparison through Gemini.",
+    intro: "RuFact combines three stages: separate statistical ML analysis for Russian and English, internet source search through Tavily, and claim-to-source comparison through Gemini.",
     architecture: "How the system works",
     stages: [
       { title: "Russian ML model", description: "The word-and-character TF-IDF model was trained only on a Russian corpus. It scores writing patterns; it does not verify facts.", detail: `${MODEL_QUALITY.dataset.samples} Russian external evaluation texts` },
@@ -37,7 +38,7 @@ const multilingualCopy = {
       { title: "Gemini analysis", description: "Extracts claims and compares them only with passages retrieved by Tavily. The response follows the selected language.", detail: "Supported · contradicted · unsure" },
     ],
     accuracyTitle: "An important note about accuracy",
-    accuracy: `The external accuracy of the Russian ML model is ${Math.round((MODEL_QUALITY.metrics.find((item) => item.key === "accuracy")?.value ?? 0) * 100)}%. This number does not apply to Uzbek or English text. Source verification is the primary signal for those languages.`,
+    accuracy: `The external accuracy of the Russian ML model is ${Math.round((MODEL_QUALITY.metrics.find((item) => item.key === "accuracy")?.value ?? 0) * 100)}%. This number does not apply to English or Uzbek text. The English model’s separate held-out results are shown below. Source review takes precedence when available.`,
     limitationsTitle: "Limitations",
     limitations: ["A missing internet source does not prove that a claim is false.", "Gemini can make mistakes or misread a source’s context.", "For important decisions, open the original document and multiple independent sources."],
   },
@@ -69,6 +70,7 @@ export function ModelPageContent() {
         <ModelSystemOverview />
         <ModelTransparency />
         <ModelEvaluationDetails />
+        <EnglishModelQuality />
       </>
     );
   }
@@ -133,6 +135,7 @@ export function ModelPageContent() {
           </ul>
         </article>
       </section>
+      <EnglishModelQuality />
     </>
   );
 }

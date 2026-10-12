@@ -1,10 +1,27 @@
 # RuFact ML
 
-CPU-friendly, reproducible baseline for Russian misinformation-risk classification.
+CPU-friendly, reproducible baselines for Russian and English misinformation-risk classification.
 It is a text-style classifier, not a web fact-checker: it estimates whether a text
 resembles the labelled `REAL` or `FAKE` examples in its training data.
 
 ## What is trained
+
+The Russian v2 artifact remains unchanged. The separate English v1 baseline is
+trained on 8,127 deduplicated LIAR claims and scores **63.878% held-out accuracy**
+on 1,016 English claims (61.836% macro F1; majority baseline 54.724%). Its dataset
+is research-only and mostly US politics from 2007–2016. See
+[`ENGLISH_MODEL_CARD.md`](ENGLISH_MODEL_CARD.md) for rights, label mapping,
+leakage controls, errors and calibration. It is not a fact-checker.
+
+```bash
+uv run --project ml rufact-train-en
+```
+
+This writes `artifacts/en/model.joblib`, `metrics.json` and `artifact-manifest.json`
+without replacing Russian files. Both artifacts are committed for reproducible CPU
+deployment; raw datasets remain ignored. The API detects supported content language
+independently of UI locale. Uzbek/ambiguous text returns 422, not a Russian score.
+The Next.js layer can still return a source review without a statistical model.
 
 - word TF-IDF features with 1–2 word n-grams;
 - character TF-IDF features with 3–5 character n-grams;
@@ -61,8 +78,8 @@ not end-user login.
 Endpoints:
 
 - `GET /health`
-- `GET /model-info`
-- authenticated `POST /predict` with `{ "text": "..." }`
+- `GET /model-info?language=ru` or `?language=en`
+- authenticated `POST /predict` with `{ "text": "...", "language": "auto" }`
 - interactive API documentation at `http://127.0.0.1:8000/docs`
 
 The production container runs as an unprivileged user, verifies its model checksum,
@@ -81,6 +98,10 @@ The runtime dependency set and JavaScript production dependencies are audited in
 the release checklist. Development-only packages are not copied into the container.
 
 ## Important limitations
+
+English LIAR is research-only. Its held-out score cannot be transferred to Russian,
+Uzbek, current UK news or the complete Tavily/Gemini pipeline. Language routing is
+a script/lexical heuristic for these supported languages, not a universal detector.
 
 - The core FAKE class is synthetic; auxiliary data contrasts Panorama satire with a
   deterministic Lenta news sample.

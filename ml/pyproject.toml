@@ -1,7 +1,7 @@
 [project]
 name = "rufact-ml"
 version = "0.1.0"
-description = "Reproducible Russian misinformation-risk classifier and FastAPI service for RuFact"
+description = "Reproducible Russian and English misinformation-risk classifiers for RuFact"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -22,6 +22,7 @@ dev = [
 
 [project.scripts]
 rufact-train = "rufact_ml.training:main"
+rufact-train-en = "rufact_ml.english_training:main"
 
 [build-system]
 requires = ["hatchling"]

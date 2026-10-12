@@ -14,6 +14,7 @@ import { useLanguage } from "./LanguageProvider";
 interface GeminiReviewPanelProps {
   review: GeminiReview;
   primaryLabel: AnalysisLabel;
+  hasStatisticalResult?: boolean;
 }
 
 const certaintyCopy = {
@@ -53,6 +54,7 @@ const unavailableCopy: Record<
 export function GeminiReviewPanel({
   review,
   primaryLabel,
+  hasStatisticalResult = true,
 }: GeminiReviewPanelProps) {
   const { locale, copy } = useLanguage();
   const labels = locale === "uz"
@@ -126,9 +128,9 @@ export function GeminiReviewPanel({
             </span>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 text-[0.625rem]">
+          {hasStatisticalResult ? <div className="mt-3 grid grid-cols-2 gap-2 text-[0.625rem]">
             <div className="rounded-[9px] bg-white/60 px-3 py-2">
-              <span className="block text-[#778796]">RuFact ML</span>
+              <span className="block text-[#778796]">RuFact ML · {locale === "ru" ? "статистический класс" : locale === "uz" ? "statistik sinf" : "statistical class"}</span>
               <strong className="mt-0.5 block text-[0.8125rem] text-[#173b59]">
                 {primaryLabel}
               </strong>
@@ -139,7 +141,7 @@ export function GeminiReviewPanel({
                 {review.label}
               </strong>
             </div>
-          </div>
+          </div> : null}
 
           <p className="mt-3 text-[0.6875rem] leading-[1.55] text-[#5c7082]">
             {review.explanation}

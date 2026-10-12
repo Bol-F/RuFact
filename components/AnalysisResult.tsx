@@ -9,7 +9,8 @@ import {
   RefreshCw,
   SearchCheck,
 } from "lucide-react";
-import type { AnalysisResponse } from "@/lib/api";
+import { getPublicVerdict, type AnalysisResponse } from "@/lib/api";
+import { verdictCopy } from "@/lib/verdict-copy";
 import { ConfidenceRing } from "./ConfidenceRing";
 import { GeminiReviewPanel } from "./GeminiReviewPanel";
 import { LoadingState } from "./LoadingState";
@@ -38,7 +39,8 @@ export function AnalysisResult({
   errorMessage,
   onRetry,
 }: AnalysisResultProps) {
-  const { copy } = useLanguage();
+  const { locale, copy } = useLanguage();
+  const verdictText = verdictCopy[locale];
 
   // A result is shown only after an explicit check or history restore, in every language.
   if (status === "initial" || (!result && status === "success")) {
@@ -57,14 +59,22 @@ export function AnalysisResult({
     );
   }
 
-  const isFake = result?.label === "FAKE";
+  const verdict = result ? getPublicVerdict(result) : null;
+  const isSource = verdict?.basis === "sources";
+  const isUnsure = verdict?.label === "UNSURE";
+  const isFake = verdict?.label === "FAKE";
   const tone = isFake ? "fake" : "real";
-  const accent = isFake ? "#c7353c" : "#2f7447";
-  const panelClass = isFake
+  const accent = isUnsure ? "#8a622f" : isFake ? "#c7353c" : "#2f7447";
+  const panelClass = isUnsure ? "border-[#e8d9b9] bg-[#fff7e9]" : isFake
     ? "border-[#f2d9d4] bg-[linear-gradient(110deg,#ffefec,#fae6e2)]"
     : "border-[#d6e7d8] bg-[linear-gradient(110deg,#eef7ef,#e3f0e5)]";
   const isDemo = result?.meta?.engine !== "external-model";
   const isLowConfidence = (result?.confidence ?? 1) < 0.6;
+  const headline = isUnsure ? verdictText.unsure : isSource ? verdict?.label
+    : isFake ? verdictText.highRisk : verdictText.lowRisk;
+  const description = verdict?.basis === "unavailable" ? result?.meta?.engineVersion === "source-review-not-retained" ? verdictText.historyReview : verdictText.unavailable
+    : isSource ? isUnsure ? verdictText.insufficient : isFake ? verdictText.contradicted : verdictText.supported
+      : verdictText.statisticalNote;
 
   return (
     <motion.article
@@ -80,10 +90,10 @@ export function AnalysisResult({
         <div className="flex min-w-0 flex-1 basis-[12rem] items-center gap-2 sm:gap-3">
           <span
             className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] sm:h-9 sm:w-9 sm:rounded-[11px] ${
-              !result ? "bg-[#e2edf6] text-[#285b87]" : isFake ? "bg-[#ffe6e3] text-[#d63b43]" : "bg-[#e0eee2] text-[#34794b]"
+              !result || isUnsure ? "bg-[#e2edf6] text-[#285b87]" : isFake ? "bg-[#ffe6e3] text-[#d63b43]" : "bg-[#e0eee2] text-[#34794b]"
             }`}
           >
-            {!result ? (
+            {!result || isUnsure ? (
               <SearchCheck size={18} strokeWidth={2} aria-hidden="true" />
             ) : isFake ? (
               <AlertCircle size={18} strokeWidth={2} aria-hidden="true" />
@@ -103,7 +113,7 @@ export function AnalysisResult({
                 : "bg-[#dcebdd] text-[#316746]"
             }`}
           >
-            {isDemo ? copy.result.demo : copy.result.model}
+            {isSource ? "Tavily + Gemini" : isUnsure ? verdictText.unsure : isDemo ? copy.result.demo : `${copy.result.model} · ${result.meta?.language?.toUpperCase() ?? "RU"}`}
           </span>
           <time className="max-w-[72px] text-right text-[0.5rem] leading-tight font-medium text-[#768398] sm:max-w-none sm:text-[0.6875rem]">
             {timestamp}
@@ -152,7 +162,7 @@ export function AnalysisResult({
           </motion.div>
         ) : result ? (
           <motion.div
-            key={`${result.label}-${result.confidence}`}
+            key={`${verdict?.basis}-${verdict?.label}-${result.confidence}`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
@@ -160,15 +170,17 @@ export function AnalysisResult({
           >
             <section
               className={`mt-2.5 flex flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2.5 sm:mt-3 sm:gap-5 sm:rounded-[15px] sm:px-4 sm:py-3.5 ${panelClass}`}
-              aria-label={`${copy.result.resultAria}: ${result.label}`}
+              data-verdict-basis={verdict?.basis}
+              data-verdict-label={verdict?.label}
+              aria-label={`${copy.result.resultAria}: ${headline}`}
             >
               <div className="flex min-w-0 flex-1 basis-[9rem] items-center gap-2.5 sm:basis-[12rem] sm:gap-4">
                 <span
                   className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] sm:h-11 sm:w-11 sm:rounded-[12px] ${
-                    isFake ? "bg-[#f5c8c8] text-[#c63840]" : "bg-[#cfe4d2] text-[#347a4d]"
+                    isUnsure ? "bg-[#f0e2c8] text-[#8a622f]" : isFake ? "bg-[#f5c8c8] text-[#c63840]" : "bg-[#cfe4d2] text-[#347a4d]"
                   }`}
                 >
-                  {isFake ? (
+                  {isUnsure ? <SearchCheck size={20} aria-hidden="true" /> : isFake ? (
                     <AlertTriangle size={19} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
                   ) : (
                     <CheckCircle2 size={20} strokeWidth={2.2} aria-hidden="true" />
@@ -176,30 +188,33 @@ export function AnalysisResult({
                 </span>
                 <div className="min-w-0">
                   <p
-                    className="text-[2.125rem] leading-none font-extrabold tracking-[-0.04em] sm:text-[3rem]"
+                    className="break-words text-[1.5rem] leading-tight font-extrabold tracking-[-0.04em] sm:text-[2.25rem]"
                     style={{ color: accent }}
                   >
-                    {result.label}
+                    {headline}
                   </p>
                   <p className="mt-1 max-w-[240px] text-[0.5625rem] leading-[1.3] text-[#5e5e68] sm:mt-2 sm:max-w-[300px] sm:text-[0.75rem] sm:leading-[1.4]">
-                    {isLowConfidence
-                      ? copy.result.lowConfidence
-                      : isFake
-                      ? copy.result.fake
-                      : copy.result.real}
+                    {description}
                   </p>
                 </div>
               </div>
 
-              <div className="mx-auto shrink-0">
-                <ConfidenceRing value={result.confidence} label={copy.result.confidence} tone={tone} />
-              </div>
+              {verdict?.confidence !== null && verdict?.confidence !== undefined ? <div className="mx-auto shrink-0">
+                <ConfidenceRing value={verdict.confidence} label={verdictText.modelConfidence} tone={tone} />
+              </div> : isSource && verdict?.certainty ? <p className="rounded-xl border border-current/10 bg-white/50 px-3 py-2 text-xs font-bold" style={{ color: accent }}>{verdictText[verdict.certainty]}</p> : null}
             </section>
+
+            {isSource && result.meta?.engine === "external-model" ? (
+              <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#69778c]" data-statistical-summary>
+                {verdictText.statistical}: ML · {result.meta.language?.toUpperCase() ?? "RU"} · {result.label} · {Math.round(result.confidence * 100)}%. {verdictText.statisticalNote}
+              </p>
+            ) : !isSource && isLowConfidence && !isUnsure ? <p className="mt-2 text-xs text-[#8a622f]">{copy.result.lowConfidence}</p> : null}
 
             {result.geminiReview ? (
               <GeminiReviewPanel
                 review={result.geminiReview}
                 primaryLabel={result.label}
+                hasStatisticalResult={result.meta?.engine === "external-model"}
               />
             ) : null}
 

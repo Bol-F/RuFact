@@ -18,7 +18,7 @@ const requiredMessages: Record<Locale, string> = {
 async function expectNoVerdict(page: Page) {
   const result = page.locator(".analysis-result");
   await expect(result.getByRole("meter")).toHaveCount(0);
-  await expect(result.locator('section[aria-label$=": FAKE"], section[aria-label$=": REAL"]')).toHaveCount(0);
+  await expect(result.locator('section[data-verdict-label="FAKE"], section[data-verdict-label="REAL"]')).toHaveCount(0);
   await expect(result.locator("time")).toHaveCount(0);
   await expect(result).not.toContainText(/\b(?:FAKE|REAL)\b|91%|2024|Демо-анализ|Demo analysis|Demo tahlil/);
   await expect(result.getByRole("region")).toHaveCount(0);
@@ -109,7 +109,7 @@ test("examples only fill a draft; a submitted result clears and restores from op
   } finally {
     release();
   }
-  const verdict = page.locator('.analysis-result section[aria-label$=": FAKE"]');
+  const verdict = page.locator('.analysis-result section[data-verdict-label="FAKE"]');
   await expect(verdict).toBeVisible();
   await expect(verdict).toContainText("87%");
   await expect(page.locator(".analysis-result time")).toBeVisible();
@@ -146,7 +146,7 @@ test("real submitted results and unsent drafts survive language changes but are 
   const submitted = "Ташкент — столица Узбекистана.";
   await input.fill(submitted);
   await page.locator(".analyzer-submit").click();
-  const verdict = page.locator('.analysis-result section[aria-label$=": REAL"]');
+  const verdict = page.locator('.analysis-result section[data-verdict-label="REAL"]');
   await expect(verdict).toBeVisible();
   const draft = "A different draft has not been checked yet. Ўзбекистон.";
   await input.fill(draft);

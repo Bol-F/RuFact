@@ -12,10 +12,10 @@ import type {
 
 export type { GeminiReview } from "@/lib/gemini-review";
 
-export type AnalysisLabel = "REAL" | "FAKE";
+export type AnalysisLabel = "REAL" | "FAKE" | "UNSURE";
 export type SignalTone = "risk" | "reassuring";
 export type SignalSeverity = "low" | "medium" | "high";
-export type AnalysisEngine = "demo-heuristic" | "external-model";
+export type AnalysisEngine = "demo-heuristic" | "external-model" | "unavailable";
 
 export interface EvidenceSpan {
   id: string;
@@ -52,6 +52,7 @@ export interface AnalysisMeta {
   engine: AnalysisEngine;
   engineVersion: string;
   externalSourcesChecked: boolean;
+  language?: "ru" | "en";
 }
 
 export interface AnalysisResponse {
@@ -63,6 +64,25 @@ export interface AnalysisResponse {
   sourceReview?: SourceReview;
   meta?: AnalysisMeta;
   geminiReview?: GeminiReview;
+}
+
+/** Source evidence leads the public conclusion; a text classifier is a separate signal. */
+export function getPublicVerdict(result: AnalysisResponse) {
+  if (result.geminiReview?.status === "complete") {
+    return {
+      basis: "sources" as const,
+      label: result.geminiReview.label,
+      confidence: null,
+      certainty: result.geminiReview.certainty,
+      explanation: result.geminiReview.explanation,
+    };
+  }
+  if (result.meta?.engine === "unavailable" || result.label === "UNSURE") {
+    return { basis: "unavailable" as const, label: "UNSURE" as const,
+      confidence: null, certainty: null, explanation: result.explanation };
+  }
+  return { basis: "statistical" as const, label: result.label,
+    confidence: result.confidence, certainty: null, explanation: result.explanation };
 }
 
 type DetectorSpec = {
@@ -386,7 +406,7 @@ function sanitizeGeminiReview(
   }
 
   const expectedAgreement =
-    review.label === "UNSURE" ? null : review.label === primaryLabel;
+    review.label === "UNSURE" || primaryLabel === "UNSURE" ? null : review.label === primaryLabel;
   if (review.agreesWithPrimary !== expectedAgreement) {
     return null;
   }
@@ -533,7 +553,7 @@ function sanitizeAnalysisResponse(
   const candidate = value as Record<string, unknown>;
 
   if (
-    (candidate.label !== "REAL" && candidate.label !== "FAKE") ||
+    (candidate.label !== "REAL" && candidate.label !== "FAKE" && candidate.label !== "UNSURE") ||
     typeof candidate.confidence !== "number" ||
     !Number.isFinite(candidate.confidence) ||
     candidate.confidence < 0 ||
@@ -541,6 +561,11 @@ function sanitizeAnalysisResponse(
   ) {
     return null;
   }
+
+  if (candidate.label === "UNSURE" && (
+    candidate.confidence !== 0 || !candidate.meta || typeof candidate.meta !== "object" ||
+    (candidate.meta as Record<string, unknown>).engine !== "unavailable"
+  )) return null;
 
   const response: AnalysisResponse = {
     label: candidate.label,
@@ -648,7 +673,7 @@ function sanitizeAnalysisResponse(
   if (candidate.meta && typeof candidate.meta === "object") {
     const meta = candidate.meta as Record<string, unknown>;
     if (
-      (meta.engine === "demo-heuristic" || meta.engine === "external-model") &&
+      (meta.engine === "demo-heuristic" || meta.engine === "external-model" || meta.engine === "unavailable") &&
       typeof meta.engineVersion === "string" &&
       meta.externalSourcesChecked === false
     ) {
@@ -656,6 +681,7 @@ function sanitizeAnalysisResponse(
         engine: meta.engine,
         engineVersion: meta.engineVersion.slice(0, 100),
         externalSourcesChecked: false,
+        ...(meta.language === "ru" || meta.language === "en" ? { language: meta.language } : {}),
       };
     }
   }
@@ -735,7 +761,8 @@ export function getMockAnalysis(text: string): AnalysisResponse {
 /**
  * Sends text through the same-origin Next.js route. That route reads the server-only
  * ML_API_URL setting and proxies FastAPI without exposing backend topology to browsers.
- * When ML_API_URL is absent, the route explicitly returns the labelled demo engine.
+ * Source review is independent of ML. Without either result, the route returns
+ * an explicit UNSURE/no-model response rather than a synthetic classifier verdict.
  */
 export async function analyzeText(
   text: string,

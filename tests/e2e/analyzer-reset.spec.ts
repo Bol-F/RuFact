@@ -8,7 +8,7 @@ async function expectResetAnalyzer(page: Page) {
   await expect(page.locator(".analysis-result").getByRole("meter")).toHaveCount(0);
   await expect(page.locator(".analysis-result").getByRole("alert")).toHaveCount(0);
   await expect(page.locator(".analysis-result time")).toHaveCount(0);
-  await expect(page.locator('.analysis-result section[aria-label$=": FAKE"], .analysis-result section[aria-label$=": REAL"]')).toHaveCount(0);
+  await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"], .analysis-result section[data-verdict-label="REAL"]')).toHaveCount(0);
 }
 
 test("checking locks history and Clear so a pending request cannot undo a user reset", async ({ page }) => {
@@ -35,7 +35,7 @@ test("checking locks history and Clear so a pending request cannot undo a user r
 
   await input.fill("Первый проверенный текст сохраняется в истории с согласия пользователя.");
   await page.locator(".analyzer-submit").click();
-  await expect(page.locator('.analysis-result section[aria-label$=": REAL"]')).toBeVisible();
+  await expect(page.locator('.analysis-result section[data-verdict-label="REAL"]')).toBeVisible();
   await historyTrigger.click();
   await expect(history.getByRole("listitem")).toHaveCount(1);
   await history.getByRole("button", { name: "Закрыть историю", exact: true }).click();
@@ -58,7 +58,7 @@ test("checking locks history and Clear so a pending request cannot undo a user r
   } finally {
     release();
   }
-  await expect(page.locator('.analysis-result section[aria-label$=": FAKE"]')).toContainText("87%");
+  await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"]')).toContainText("87%");
   await expect(historyTrigger).toBeEnabled();
   await page.getByRole("button", { name: "Очистить текст", exact: true }).click();
   await expectResetAnalyzer(page);

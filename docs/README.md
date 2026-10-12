@@ -10,9 +10,12 @@
   проверки источников через Tavily + Gemini.
 - [`ROADMAP_10_DAYS.md`](ROADMAP_10_DAYS.md) — выполненный десятидневный MVP-план.
 - [`../ml/MODEL_CARD.md`](../ml/MODEL_CARD.md) — назначение, качество и ограничения
-  ML-модели.
+  русской ML-модели.
+- [`../ml/ENGLISH_MODEL_CARD.md`](../ml/ENGLISH_MODEL_CARD.md) — английская модель,
+  независимый тест, ограничения и права на исследовательские данные LIAR.
 - [`../ml/DATASET_RESEARCH.md`](../ml/DATASET_RESEARCH.md) — аудит выбранных и
   отклонённых датасетов.
 
-Авторитетные машинные метрики находятся в `ml/artifacts/metrics.json`, а список
+Авторитетные машинные метрики находятся в `ml/artifacts/metrics.json` (русский)
+и `ml/artifacts/en/metrics.json` (английский), а список
 всех переменных без секретных значений — в `.env.example`.

@@ -41,9 +41,13 @@ def _authorized_request(payload: dict[str, str], secret: str = TEST_JWT_SECRET):
         }
     )
     unsigned = f"{header}.{claims}"
-    signature = base64.urlsafe_b64encode(
-        hmac.new(secret.encode(), unsigned.encode(), hashlib.sha256).digest()
-    ).rstrip(b"=").decode()
+    signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(secret.encode(), unsigned.encode(), hashlib.sha256).digest()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
     return body, {
         "Authorization": f"Bearer {unsigned}.{signature}",
         "Content-Type": "application/json",
@@ -75,6 +79,7 @@ def test_health_and_prediction_contract() -> None:
             "engine": "external-model",
             "engineVersion": "tfidf-word-char-logreg-ru-v2",
             "externalSourcesChecked": False,
+            "language": "ru",
         }
         for evidence in payload["evidence"]:
             assert evidence["start"] < evidence["end"]
@@ -134,3 +139,47 @@ def test_model_info_exposes_measured_quality() -> None:
         assert headline["samples"] == 157
         assert headline["metrics"]["accuracy"] == 0.808917
         assert headline["metrics"]["confusionMatrix"] == [[65, 11], [19, 62]]
+
+
+def test_english_routing_and_quality() -> None:
+    with TestClient(app) as client:
+        response = _post_prediction(client, "Trump has six wives")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["meta"]["language"] == "en"
+        assert payload["meta"]["engineVersion"] == "tfidf-word-char-logreg-en-v1"
+        assert "English" in payload["explanation"]
+        assert client.get("/health").json()["availableModels"].keys() == {"ru", "en"}
+        info = client.get("/model-info?language=en")
+        assert info.status_code == 200
+        assert info.json()["language"] == "en"
+        test_metrics = info.json()["evaluation"]["heldOutTest"]
+        assert test_metrics["samples"] == 1016
+        assert test_metrics["metrics"]["accuracy"] == 0.63878
+        for evidence in payload["evidence"]:
+            assert "Trump has six wives"[evidence["start"] : evidence["end"]] == evidence["quote"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Bu xabar rost emas va uning manbasi yo‘q.",
+        "Бу хабар рост эмас ва унинг манбаси йўқ.",
+        "123456789",
+        "中文测试",
+    ],
+)
+def test_unsupported_text_never_falls_back_to_russian(text: str) -> None:
+    with TestClient(app) as client:
+        assert _post_prediction(client, text).status_code == 422
+
+
+def test_explicit_language_mismatch_and_signed_body() -> None:
+    with TestClient(app) as client:
+        body, headers = _authorized_request({"text": "This is an English claim.", "language": "ru"})
+        assert client.post("/predict", content=body, headers=headers).status_code == 422
+        body, headers = _authorized_request({"text": "This is an English claim.", "language": "en"})
+        assert client.post("/predict", content=body, headers=headers).status_code == 200
+        body, headers = _authorized_request({"text": "This is an English claim.", "language": "uz"})
+        assert client.post("/predict", content=body, headers=headers).status_code == 422
+        assert client.get("/model-info?language=uz").status_code == 422

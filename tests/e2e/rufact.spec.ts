@@ -158,14 +158,14 @@ test("desktop analysis workflow and guidance", async ({ page }, testInfo) => {
   await page.getByRole("button", { name: /Проверить текст/u }).click();
 
   await expect(
-    page.getByRole("region", { name: /Результат: (?:REAL|FAKE)/u }),
+    page.getByRole("region", { name: /Результат: /u }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("ML-модель", { exact: true })).toBeVisible();
+  await expect(page.getByText("ML-модель · RU", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Копировать отчёт" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Скачать .txt" })).toBeVisible();
 
   await page.getByText("Что означает процент в результате?", { exact: true }).click();
-  await expect(page.getByText(/Точность измерена/u)).toBeVisible();
+  await expect(page.getByText(/Русская и английская модели оценены/u)).toBeVisible();
 
   if (process.env.CAPTURE_QA === "1") {
     await page.screenshot({

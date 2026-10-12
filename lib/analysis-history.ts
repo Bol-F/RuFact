@@ -15,6 +15,7 @@ const RETENTION_MS = ANALYSIS_HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1_000;
 export interface AnalysisHistoryMeta {
   readonly engine: AnalysisEngine;
   readonly version: string;
+  readonly language?: "ru" | "en";
 }
 
 export interface AnalysisHistoryEntry {
@@ -92,7 +93,7 @@ function hasExactKeys(record: Record<string, unknown>, expected: readonly string
 }
 
 function isAnalysisEngine(value: unknown): value is AnalysisEngine {
-  return value === "demo-heuristic" || value === "external-model";
+  return value === "demo-heuristic" || value === "external-model" || value === "unavailable";
 }
 
 function isCanonicalIsoTimestamp(value: unknown, now: number): value is string {
@@ -110,7 +111,10 @@ function isCanonicalIsoTimestamp(value: unknown, now: number): value is string {
 }
 
 function isHistoryMeta(value: unknown): value is AnalysisHistoryMeta {
-  if (!isRecord(value) || !hasExactKeys(value, ["engine", "version"])) {
+  if (!isRecord(value) || (
+    !hasExactKeys(value, ["engine", "version"]) &&
+    !hasExactKeys(value, ["engine", "version", "language"])
+  )) {
     return false;
   }
 
@@ -119,7 +123,8 @@ function isHistoryMeta(value: unknown): value is AnalysisHistoryMeta {
     typeof value.version === "string" &&
     value.version.trim() === value.version &&
     value.version.length > 0 &&
-    value.version.length <= MAX_ENGINE_VERSION_LENGTH
+    value.version.length <= MAX_ENGINE_VERSION_LENGTH &&
+    (value.language === undefined || value.language === "ru" || value.language === "en")
   );
 }
 
@@ -146,7 +151,7 @@ function isHistoryEntry(value: unknown, now: number): value is AnalysisHistoryEn
     value.text.trim() === value.text &&
     value.text.length > 0 &&
     value.text.length <= MAX_TEXT_LENGTH &&
-    (value.label === "REAL" || value.label === "FAKE") &&
+    (value.label === "REAL" || value.label === "FAKE" || value.label === "UNSURE") &&
     typeof value.confidence === "number" &&
     Number.isFinite(value.confidence) &&
     value.confidence >= 0 &&
@@ -371,7 +376,7 @@ export function addAnalysisHistoryEntry(
     input.status !== "success" ||
     text.length === 0 ||
     text.length > MAX_TEXT_LENGTH ||
-    (input.label !== "REAL" && input.label !== "FAKE") ||
+    (input.label !== "REAL" && input.label !== "FAKE" && input.label !== "UNSURE") ||
     typeof input.confidence !== "number" ||
     !Number.isFinite(input.confidence) ||
     input.confidence < 0 ||
@@ -396,6 +401,7 @@ export function addAnalysisHistoryEntry(
     meta: {
       engine: input.meta.engine,
       version: input.meta.version,
+      ...(input.meta.language ? { language: input.meta.language } : {}),
     },
   };
   const items = [

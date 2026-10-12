@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-12T11:16:00Z",
+  "language": "en",
+  "modelVersion": "tfidf-word-char-logreg-en-v1",
+  "modelName": "RuFact English LIAR Word + Character TF-IDF Logistic Regression",
+  "maxTextLength": 5000,
+  "seed": 20261012,
+  "dataset": {
+    "name": "LIAR v1.0 (English short claims)",
+    "url": "https://sites.cs.ucsb.edu/~william/data/liar_dataset.zip",
+    "archiveSha256": "611c1addad919743dde15822b87a60bfb760d8f85597f25289e34621800654c7",
+    "memberSha256": {
+      "train.tsv": "23ef8cb7ff57b25c941100d0744039cebc595d65a67ea190f72b330a658d8c36",
+      "valid.tsv": "8dd3d7ed1a11e78ed7df090c9eddb0f91147f895850c78d49dd7b4e88fd09a16",
+      "test.tsv": "ee41e2c741e0019216952625145af8c4aa8c8d3057ec68284b134267bb845e6f"
+    },
+    "license": "Research purposes only; original sources retain copyright",
+    "labelMapping": {
+      "REAL": [
+        "true",
+        "mostly-true"
+      ],
+      "FAKE": [
+        "false",
+        "barely-true",
+        "pants-fire"
+      ],
+      "excluded": [
+        "half-true"
+      ]
+    },
+    "splits": {
+      "train": {
+        "rawSamples": 10269,
+        "originalLabelCounts": {
+          "barely-true": 1657,
+          "false": 1998,
+          "half-true": 2123,
+          "mostly-true": 1966,
+          "pants-fire": 842,
+          "true": 1683
+        },
+        "halfTrueExcluded": 2123,
+        "binarySamplesBeforeDeduplication": 8146,
+        "samples": 8127,
+        "real": 3644,
+        "fake": 4483,
+        "heldOutOverlapRemoved": 9,
+        "withinSplitDuplicatesRemoved": 8,
+        "conflictingLabelRowsRemoved": 2
+      },
+      "valid": {
+        "rawSamples": 1284,
+        "originalLabelCounts": {
+          "barely-true": 237,
+          "false": 263,
+          "half-true": 248,
+          "mostly-true": 251,
+          "pants-fire": 116,
+          "true": 169
+        },
+        "halfTrueExcluded": 248,
+        "binarySamplesBeforeDeduplication": 1036,
+        "samples": 1036,
+        "real": 420,
+        "fake": 616,
+        "heldOutOverlapRemoved": 0,
+        "withinSplitDuplicatesRemoved": 0,
+        "conflictingLabelRowsRemoved": 0
+      },
+      "test": {
+        "rawSamples": 1283,
+        "originalLabelCounts": {
+          "barely-true": 214,
+          "false": 250,
+          "half-true": 267,
+          "mostly-true": 249,
+          "pants-fire": 92,
+          "true": 211
+        },
+        "halfTrueExcluded": 267,
+        "binarySamplesBeforeDeduplication": 1016,
+        "samples": 1016,
+        "real": 460,
+        "fake": 556,
+        "heldOutOverlapRemoved": 0,
+        "withinSplitDuplicatesRemoved": 0,
+        "conflictingLabelRowsRemoved": 0
+      }
+    },
+    "deduplication": "NFKC + whitespace normalization + 5000-char truncation + casefold; test > validation > train priority; conflicting labels excluded",
+    "featuresUsed": [
+      "statement"
+    ],
+    "featuresExcluded": [
+      "id",
+      "speaker",
+      "history counts",
+      "party",
+      "subject",
+      "context"
+    ]
+  },
+  "evaluation": {
+    "headline": "heldOutTest",
+    "modelSelection": {
+      "samples": 518,
+      "selectedC": 1.0,
+      "criterion": "macroF1; fixed threshold 0.5; tie prefers lower C",
+      "candidates": {
+        "0.25": {
+          "accuracy": 0.681467,
+          "macroF1": 0.675013,
+          "precisionFake": 0.75265,
+          "recallFake": 0.691558,
+          "precisionReal": 0.595745,
+          "recallReal": 0.666667,
+          "rocAuc": 0.737539,
+          "brierScore": 0.216898,
+          "logLoss": 0.624651,
+          "confusionMatrix": [
+            [
+              140,
+              70
+            ],
+            [
+              95,
+              213
+            ]
+          ]
+        },
+        "1.0": {
+          "accuracy": 0.694981,
+          "macroF1": 0.687528,
+          "precisionFake": 0.758621,
+          "recallFake": 0.714286,
+          "precisionReal": 0.614035,
+          "recallReal": 0.666667,
+          "rocAuc": 0.736503,
+          "brierScore": 0.208273,
+          "logLoss": 0.604265,
+          "confusionMatrix": [
+            [
+              140,
+              70
+            ],
+            [
+              88,
+              220
+            ]
+          ]
+        },
+        "4.0": {
+          "accuracy": 0.69112,
+          "macroF1": 0.68318,
+          "precisionFake": 0.753425,
+          "recallFake": 0.714286,
+          "precisionReal": 0.610619,
+          "recallReal": 0.657143,
+          "rocAuc": 0.722263,
+          "brierScore": 0.213421,
+          "logLoss": 0.619807,
+          "confusionMatrix": [
+            [
+              138,
+              72
+            ],
+            [
+              88,
+              220
+            ]
+          ]
+        }
+      }
+    },
+    "calibration": {
+      "samples": 518,
+      "method": "sigmoid on independent half of validation; C=1; no class reweighting"
+    },
+    "heldOutTest": {
+      "protocol": "Official test split after deduplication; never used for fitting, selection, calibration or threshold tuning. Statement text only.",
+      "samples": 1016,
+      "metrics": {
+        "accuracy": 0.63878,
+        "macroF1": 0.618362,
+        "precisionFake": 0.635971,
+        "recallFake": 0.794964,
+        "precisionReal": 0.64486,
+        "recallReal": 0.45,
+        "rocAuc": 0.698287,
+        "brierScore": 0.219132,
+        "logLoss": 0.627307,
+        "confusionMatrix": [
+          [
+            207,
+            253
+          ],
+          [
+            114,
+            442
+          ]
+        ]
+      },
+      "uncalibratedMetrics": {
+        "accuracy": 0.643701,
+        "macroF1": 0.642098,
+        "precisionFake": 0.683712,
+        "recallFake": 0.649281,
+        "precisionReal": 0.60041,
+        "recallReal": 0.636957,
+        "rocAuc": 0.698287,
+        "brierScore": 0.219499,
+        "logLoss": 0.628391,
+        "confusionMatrix": [
+          [
+            293,
+            167
+          ],
+          [
+            195,
+            361
+          ]
+        ]
+      },
+      "confidenceIntervals": {
+        "accuracy95": [
+          0.610236,
+          0.666339
+        ],
+        "macroF195": [
+          0.587552,
+          0.648017
+        ]
+      },
+      "majorityBaseline": {
+        "selectedOn": "training class frequencies",
+        "label": 1,
+        "accuracy": 0.547244
+      }
+    }
+  },
+  "limitations": [
+    "LIAR v1 is research-use-only; original sources retain copyright. Not commercially cleared.",
+    "Mostly US political claims from 2007–2016; not representative of all English/UK news.",
+    "Text-only statistical model: no retrieval, evidence, speaker metadata or truth guarantee.",
+    "Half-true claims are excluded, so binary metrics do not cover ambiguous/partly true claims.",
+    "Exact duplicates are removed, but paraphrases and shared speakers/topics may remain.",
+    "Official random splits are not speaker-disjoint or time-separated.",
+    "Calibration and confidence can drift on current claims, other domains and languages."
+  ]
+}

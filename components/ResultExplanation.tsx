@@ -15,6 +15,8 @@ import type {
   AnalysisSignal,
   EvidenceSpan,
 } from "@/lib/api";
+import { getPublicVerdict } from "@/lib/api";
+import { verdictCopy } from "@/lib/verdict-copy";
 import { useLanguage } from "./LanguageProvider";
 
 const fallbackContent = {
@@ -38,6 +40,7 @@ const fallbackContent = {
       "Факты отделены от оценочных суждений",
     ],
   },
+  UNSURE: { explanation: "Нет проверенного результата. Повторите проверку по источникам.", signals: [] },
 } satisfies Record<AnalysisLabel, { explanation: string; signals: string[] }>;
 
 interface ResultExplanationProps {
@@ -80,6 +83,7 @@ function buildEvidenceMap(evidence: readonly EvidenceSpan[] | undefined, analyze
 
 export function ResultExplanation({ result, analyzedText }: ResultExplanationProps) {
   const { locale, copy } = useLanguage();
+  const verdict = getPublicVerdict(result);
   const [isOpen, setIsOpen] = useState(false);
   const [isSourceOpen, setIsSourceOpen] = useState(false);
   const fallback = locale === "ru"
@@ -91,7 +95,7 @@ export function ResultExplanation({ result, analyzedText }: ResultExplanationPro
   const isModelResult = result.meta?.engine === "external-model";
   const signals = result.signals?.length
     ? result.signals
-    : isModelResult
+    : isModelResult || result.meta?.engine === "unavailable"
       ? []
       : locale === "ru"
         ? getFallbackSignals(result.label)
@@ -116,7 +120,7 @@ export function ResultExplanation({ result, analyzedText }: ResultExplanationPro
             {copy.result.why}
           </h3>
           <p className="mt-1 text-[0.65625rem] leading-[1.45] text-[#69778c] sm:mt-2 sm:text-[0.8125rem] sm:leading-[1.55]">
-            {result.explanation ??
+            {verdict.basis === "unavailable" ? verdictCopy[locale].unavailable : verdict.explanation ??
               (isModelResult
                 ? copy.result.noSavedExplanation
                 : fallback.explanation)}

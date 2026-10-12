@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field, StringConstraints
 AnalysisLabel = Literal["REAL", "FAKE"]
 SignalTone = Literal["risk", "reassuring"]
 SignalSeverity = Literal["low", "medium", "high"]
+ModelLanguage = Literal["ru", "en"]
+DetectedLanguage = Literal["ru", "en", "uz", "unknown"]
+RequestedLanguage = Literal["auto", "ru", "en", "uz"]
 AnalysisText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=5000),
@@ -13,6 +16,7 @@ AnalysisText = Annotated[
 
 class PredictionRequest(BaseModel):
     text: AnalysisText
+    language: RequestedLanguage = "auto"
 
 
 class EvidenceSpan(BaseModel):
@@ -37,6 +41,7 @@ class AnalysisMeta(BaseModel):
     engine: Literal["external-model"] = "external-model"
     engineVersion: str
     externalSourcesChecked: Literal[False] = False
+    language: ModelLanguage
 
 
 class PredictionResponse(BaseModel):
@@ -52,9 +57,11 @@ class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     ready: bool
     modelVersion: str | None
+    availableModels: dict[ModelLanguage, str]
 
 
 class ModelInfoResponse(BaseModel):
+    language: ModelLanguage
     modelVersion: str
     modelName: str
     trainedAt: str

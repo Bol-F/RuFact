@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import {
-  getMockAnalysis,
   type AnalysisLabel,
   type AnalysisResponse,
 } from "@/lib/api";
@@ -24,7 +23,6 @@ import { isAppLocale, type AppLocale } from "@/lib/i18n";
 
 const MAX_TEXT_LENGTH = 5_000;
 const MAX_BODY_BYTES = 24_000;
-const MOCK_LATENCY_MS = 900;
 const ML_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" } as const;
 
@@ -37,12 +35,9 @@ type MlSuccess = {
 
 type MlFailure = {
   ok: false;
-  status: 502 | 503;
+  status: 422 | 502 | 503;
   message: string;
 };
-
-const wait = (milliseconds: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 function jsonResponse(
   payload: unknown,
@@ -96,7 +91,9 @@ function isAnalysisPayload(value: unknown): value is AnalysisResponse {
     typeof payload.confidence === "number" &&
     Number.isFinite(payload.confidence) &&
     payload.confidence >= 0 &&
-    payload.confidence <= 1
+    payload.confidence <= 1 &&
+    Boolean(payload.meta && typeof payload.meta === "object" &&
+      ["ru", "en"].includes((payload.meta as Record<string, unknown>).language as string))
   );
 }
 
@@ -106,7 +103,7 @@ async function requestMlPrediction(
   requestSignal?: AbortSignal,
 ): Promise<MlSuccess | MlFailure> {
   const abortScope = createAbortScope(requestSignal, ML_TIMEOUT_MS);
-  const requestBody = JSON.stringify({ text });
+  const requestBody = JSON.stringify({ text, language: "auto" });
 
   let authorization: ReturnType<typeof createMlServiceAuthorization>;
   try {
@@ -136,7 +133,7 @@ async function requestMlPrediction(
     if (!response.ok) {
       return {
         ok: false,
-        status: 502,
+        status: response.status === 422 ? 422 : 502,
         message: "ML-сервис вернул ошибку. Попробуйте повторить запрос позже.",
       };
     }
@@ -190,7 +187,7 @@ function attachAgreement(
   return {
     ...assessment,
     agreesWithPrimary:
-      assessment.label === "UNSURE"
+      assessment.label === "UNSURE" || primaryLabel === "UNSURE"
         ? null
         : assessment.label === primaryLabel,
   };
@@ -289,19 +286,6 @@ export async function POST(request: Request) {
 
   const mlEndpoint = process.env.ML_API_URL?.trim();
 
-  if (!mlEndpoint) {
-    await wait(MOCK_LATENCY_MS);
-    const demoResult = getMockAnalysis(normalizedText);
-    return jsonResponse(
-      useGemini
-        ? {
-            ...demoResult,
-            geminiReview: unavailable("primary-unavailable"),
-          }
-        : demoResult,
-    );
-  }
-
   const geminiPromise = useGemini
     ? getRateLimitedGeminiAssessment(request, normalizedText, locale).catch(() =>
         unavailable("upstream-error"),
@@ -309,23 +293,26 @@ export async function POST(request: Request) {
     : Promise.resolve(null);
 
   const [mlResult, geminiAssessment] = await Promise.all([
-    requestMlPrediction(mlEndpoint, normalizedText, request.signal),
+    mlEndpoint ? requestMlPrediction(mlEndpoint, normalizedText, request.signal)
+      : Promise.resolve({ ok: false as const, status: 503 as const,
+          message: "No trained statistical model is currently available." }),
     geminiPromise,
   ]);
 
-  if (!mlResult.ok) {
-    return jsonResponse({ error: mlResult.message }, mlResult.status);
-  }
+  const statisticalResult: AnalysisResponse = mlResult.ok ? mlResult.payload : {
+    label: "UNSURE", confidence: 0, signals: [], evidence: [],
+    meta: { engine: "unavailable", engineVersion: "no-statistical-model", externalSourcesChecked: false },
+  };
 
   if (!geminiAssessment) {
-    return jsonResponse(mlResult.payload);
+    return jsonResponse(statisticalResult);
   }
 
   return jsonResponse({
-    ...mlResult.payload,
+    ...statisticalResult,
     geminiReview: attachAgreement(
       geminiAssessment,
-      mlResult.payload.label,
+      statisticalResult.label,
     ),
   });
 }

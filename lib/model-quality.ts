@@ -1,4 +1,15 @@
 import evaluationData from "@/ml/artifacts/metrics.json";
+import englishEvaluationData from "@/ml/artifacts/en/metrics.json";
+
+export const ENGLISH_MODEL_QUALITY = {
+  modelVersion: englishEvaluationData.modelVersion,
+  datasetName: englishEvaluationData.dataset.name,
+  trainingSamples: englishEvaluationData.dataset.splits.train.samples,
+  testSamples: englishEvaluationData.evaluation.heldOutTest.samples,
+  metrics: englishEvaluationData.evaluation.heldOutTest.metrics,
+  accuracyInterval: englishEvaluationData.evaluation.heldOutTest.confidenceIntervals.accuracy95,
+  majorityAccuracy: englishEvaluationData.evaluation.heldOutTest.majorityBaseline.accuracy,
+};
 
 export type QualityMetricKey =
   | "accuracy"

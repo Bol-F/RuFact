@@ -357,15 +357,15 @@ export function AnalysisHistoryDialog({
                             <div className="flex min-w-0 items-center gap-2.5">
                               <span
                                 className={`rounded-lg px-2.5 py-1 text-[0.625rem] font-extrabold tracking-[0.06em] ${
-                                  isFake
+                                  item.label === "UNSURE" ? "bg-[#e7edf2] text-[#53667a]" : isFake
                                     ? "bg-[#f8dddd] text-[#b5363c]"
                                     : "bg-[#dcecdf] text-[#357047]"
                                 }`}
                               >
-                                {item.label}
+                                {item.label === "UNSURE" ? "—" : `ML · ${item.label}`}
                               </span>
                               <span className="text-[0.75rem] font-extrabold tabular-nums text-[#29465f]">
-                                {formatConfidence(item.confidence)}
+                                {item.label === "UNSURE" ? "" : formatConfidence(item.confidence)}
                               </span>
                             </div>
                             <time

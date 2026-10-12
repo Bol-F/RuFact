@@ -10,6 +10,7 @@ export function analysisFixture(label: AnalysisResponse["label"] = "REAL", confi
       engine: "external-model",
       engineVersion: "analyzer-ui-regression-v1",
       externalSourcesChecked: false,
+      language: "ru",
     },
   };
 }
