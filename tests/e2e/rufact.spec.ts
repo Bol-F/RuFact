@@ -13,7 +13,7 @@ test("hero artwork loads from the public asset", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
 
   page.on("response", (response) => {
-    if (response.url().includes("hero-collage") && !response.ok()) {
+    if (response.url().includes("/artwork/") && !response.ok()) {
       failedArtworkResponses.push(`${response.status()} ${response.url()}`);
     }
   });
@@ -32,7 +32,11 @@ test("hero artwork loads from the public asset", async ({ page }, testInfo) => {
     : "";
   expect(frameworkOverlayText).not.toMatch(/Build Error|Runtime Error/u);
 
-  const heroArtwork = page.locator('img[src="/hero-collage.png"]').first();
+  const heroArtwork = page.locator('.hero-artwork img.hero-collage').first();
+  if (testInfo.project.name.startsWith("desktop")) {
+    await expect(page.locator(".hero-artwork")).toHaveAttribute("data-artwork-locale", "ru");
+    await expect(page.locator(".hero-artwork")).toHaveAttribute("data-artwork-state", "ready");
+  }
   if (testInfo.project.name.startsWith("mobile")) {
     await expect(heroArtwork).toBeHidden();
   } else {

@@ -108,8 +108,11 @@ export function formatTelegramAssessment(result: GeminiAssessment, locale: AppLo
 
 export interface TelegramStore {
   get(key: string): Promise<string | null>;
+  getMany(keys: string[]): Promise<(string | null)[]>;
   set(key: string, value: string, ttl?: number): Promise<void>;
+  setMany(entries: { key: string; value: string; ttl?: number }[]): Promise<void>;
   remove(key: string): Promise<void>;
+  removeMany(keys: string[]): Promise<void>;
   claim(key: string, token: string, ttl: number): Promise<boolean>;
   release(key: string, token: string): Promise<void>;
 }
@@ -156,11 +159,15 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
     const languageKey = `language:${identifier}`;
     const historyKey = `chat:${identifier}`;
     const modeKey = `mode:${identifier}`;
+    // Read a bounded snapshot only after obtaining the conversation lease.
+    const [savedMode, saved, cached, cachedFormat, cachedLocale] = await deps.store.getMany([
+      modeKey, languageKey, `${updateKey}:reply`, `${updateKey}:format`, `${updateKey}:locale`,
+    ]);
+    let chatMode = savedMode === "chat";
     // A preference is not conversation content. Keep it until an explicit exit.
-    if (await deps.store.get(modeKey) === "chat") await deps.store.set(modeKey, "chat");
-    const saved = await deps.store.get(languageKey);
+    // Preserve the migration from earlier, expiring chat-mode preferences.
+    if (chatMode) await deps.store.set(modeKey, "chat");
     let locale: AppLocale = saved === "uz" || saved === "ru" || saved === "en" ? saved : message.language;
-    const cached = await deps.store.get(`${updateKey}:reply`);
     let reply = cached;
     if (!reply) {
       const input = telegramButtonCommand(message.text);
@@ -174,7 +181,7 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
         if (command === "uz" || command === "ru" || command === "en") {
           locale = command;
           await deps.store.set(languageKey, locale, 30 * 86_400);
-          reply = await deps.store.get(modeKey) === "chat"
+          reply = chatMode
             ? `${{ uz: "Javob tili: O‘zbekcha.", ru: "Язык ответа: Русский.", en: "Response language: English." }[locale]}\n\n${telegramUi[locale].typing}`
             : botCopy[locale].selected;
         } else if (command === "language") {
@@ -182,21 +189,23 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
         } else if (command === "new") {
           await deps.store.remove(historyKey);
           await deps.store.set(modeKey, "chat");
+          chatMode = true;
           reply = telegramUi[locale].cleared;
         } else if (command === "chat" && !commandMatch?.[2]) {
           await deps.store.set(modeKey, "chat");
+          chatMode = true;
           reply = telegramUi[locale].chatMode;
         } else if (command === "stop") {
-          await deps.store.remove(modeKey);
-          await deps.store.remove(historyKey);
+          await deps.store.removeMany([modeKey, historyKey]);
+          chatMode = false;
           reply = telegramUi[locale].stopped;
         } else if (command === "check" && !commandMatch?.[2]) {
           await deps.store.remove(modeKey);
+          chatMode = false;
           reply = telegramUi[locale].checkMode;
         } else if (command === "forget") {
-          await deps.store.remove(languageKey);
-          await deps.store.remove(historyKey);
-          await deps.store.remove(modeKey);
+          await deps.store.removeMany([languageKey, historyKey, modeKey]);
+          chatMode = false;
           reply = botCopy[locale].forgotten;
         } else if (command === "privacy") {
           reply = botCopy[locale].privacy;
@@ -204,9 +213,14 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
           reply = `${botCopy[locale].welcome}\n\n💬 /chat — AI chat\n🔎 /check — ${telegramUi[locale].check}\n🧹 /new — ${telegramUi[locale].clear}\n⏹ /stop — ${telegramUi[locale].stop}`;
         } else {
           const text = (command === "check" || command === "chat" ? commandMatch?.[2] ?? "" : message.text).trim();
-          if (command === "chat") await deps.store.set(modeKey, "chat");
-          if (command === "check") await deps.store.remove(modeKey);
-          const chatMode = command === "chat" || (command !== "check" && await deps.store.get(modeKey) === "chat");
+          if (command === "chat") {
+            if (!chatMode) await deps.store.set(modeKey, "chat");
+            chatMode = true;
+          }
+          if (command === "check") {
+            await deps.store.remove(modeKey);
+            chatMode = false;
+          }
           if (!text) reply = botCopy[locale].unsupported;
           else if (text.length > (chatMode ? 2000 : 5000)) reply = chatMode ? (locale === "ru" ? "Максимум 2000 символов в AI-чате." : locale === "en" ? "Maximum 2000 characters in AI chat." : "AI chatda ko‘pi bilan 2000 belgi.") : botCopy[locale].tooLong;
           else {
@@ -230,7 +244,6 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
                 reply = formatTelegramChat(result, locale);
                 if (result.status === "complete") {
                   await deps.store.set(historyKey, JSON.stringify([...messages, { role: "assistant", content: result.text.slice(0, 2000) }].slice(-6)), 1800);
-                  await deps.store.set(modeKey, "chat");
                 }
               } else reply = formatTelegramAssessment(await deps.assess(text, locale), locale);
             }
@@ -238,22 +251,28 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
         }
       }
       if (!reply.startsWith("<b>")) reply = telegramNotice(reply);
-      await deps.store.set(`${updateKey}:reply`, reply, 2 * 86_400);
-      await deps.store.set(`${updateKey}:format`, "html", 2 * 86_400);
-      await deps.store.set(`${updateKey}:locale`, locale, 2 * 86_400);
+      // Transactional cache writes retain the same 48-hour retry TTLs.
+      await deps.store.setMany([
+        { key: `${updateKey}:reply`, value: reply, ttl: 2 * 86_400 },
+        { key: `${updateKey}:format`, value: "html", ttl: 2 * 86_400 },
+        { key: `${updateKey}:locale`, value: locale, ttl: 2 * 86_400 },
+      ]);
     } else {
-      if (await deps.store.get(`${updateKey}:format`) !== "html") reply = telegramNotice(reply);
-      const replyLocale = await deps.store.get(`${updateKey}:locale`);
-      if (replyLocale === "uz" || replyLocale === "ru" || replyLocale === "en") locale = replyLocale;
+      if (cachedFormat !== "html") reply = telegramNotice(reply);
+      if (cachedLocale === "uz" || cachedLocale === "ru" || cachedLocale === "en") locale = cachedLocale;
     }
-    await deps.send(message, reply, locale, await deps.store.get(modeKey) === "chat");
+    await deps.send(message, reply, locale, chatMode);
+    // Never delete the retry reply before the completion marker is durable.
     await deps.store.set(`${updateKey}:done`, "1", 2 * 86_400);
-    await deps.store.remove(`${updateKey}:reply`);
-    await deps.store.remove(`${updateKey}:locale`);
-    await deps.store.remove(`${updateKey}:format`);
+    await deps.store.removeMany([`${updateKey}:reply`, `${updateKey}:locale`, `${updateKey}:format`]);
     return "done";
   } finally {
-    if (ownsUserLock) await deps.store.release(userLock, token);
-    await deps.store.release(`${updateKey}:lock`, token);
+    // Both independent, ownership-checked releases must finish even if one fails.
+    const released = await Promise.allSettled([
+      ...(ownsUserLock ? [deps.store.release(userLock, token)] : []),
+      deps.store.release(`${updateKey}:lock`, token),
+    ]);
+    const failure = released.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
   }
 }

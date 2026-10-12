@@ -6,7 +6,7 @@ import math
 import os
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -285,6 +285,32 @@ def _find_span(text: str, feature: str) -> tuple[int, int, str] | None:
 @dataclass(slots=True)
 class ModelBundle:
     artifact: dict[str, Any]
+    _word_vectorizer: Any = field(init=False, repr=False)
+    _word_feature_names: np.ndarray = field(init=False, repr=False)
+    _word_coefficients: np.ndarray = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        # Fitted feature metadata is immutable across predictions. Constructing the
+        # full vocabulary array on every request costs more than inference itself.
+        steps = self.base_model.named_steps
+        classifier = steps["classifier"]
+        if "tfidf" in steps:
+            vectorizer = steps["tfidf"]
+            names = vectorizer.get_feature_names_out()
+            coefficients = classifier.coef_[0]
+        else:
+            features = steps["features"]
+            vectorizer = dict(features.transformer_list)["word"]
+            names = vectorizer.get_feature_names_out()
+            weight = float((features.transformer_weights or {}).get("word", 1.0))
+            coefficients = classifier.coef_[0][: len(names)] * weight
+
+        # Own the arrays so making the cache read-only cannot alter estimator state.
+        self._word_vectorizer = vectorizer
+        self._word_feature_names = np.array(names, copy=True)
+        self._word_coefficients = np.array(coefficients, copy=True)
+        self._word_feature_names.setflags(write=False)
+        self._word_coefficients.setflags(write=False)
 
     @property
     def language(self) -> ModelLanguage:
@@ -315,22 +341,11 @@ class ModelBundle:
         return min(max(calibrated, 0.0), 1.0)
 
     def _word_explanation_features(self, text: str) -> tuple[Any, np.ndarray, np.ndarray]:
-        classifier = self.base_model.named_steps["classifier"]
-        steps = self.base_model.named_steps
-        if "tfidf" in steps:
-            vectorizer = steps["tfidf"]
-            return (
-                vectorizer.transform([text]),
-                vectorizer.get_feature_names_out(),
-                classifier.coef_[0],
-            )
-
-        features = steps["features"]
-        transformers = dict(features.transformer_list)
-        vectorizer = transformers["word"]
-        names = vectorizer.get_feature_names_out()
-        weight = float((features.transformer_weights or {}).get("word", 1.0))
-        return vectorizer.transform([text]), names, classifier.coef_[0][: len(names)] * weight
+        return (
+            self._word_vectorizer.transform([text]),
+            self._word_feature_names,
+            self._word_coefficients,
+        )
 
     def _explanations(
         self,

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { changeLanguage } from "./helpers/language";
 import { analysisFixture } from "./helpers/analysis";
+import { HERO_ARTWORK } from "../../lib/hero-artwork";
 
 async function navigateFromHeader(page: Page, href: string) {
   const menu = page.locator('header button[aria-controls="mobile-navigation"]');
@@ -333,7 +334,7 @@ test("phones avoid downloading decorative regional artwork after language switch
   test.skip(!testInfo.project.name.startsWith("mobile"), "Phone image source selection");
   const artworkRequests: string[] = [];
   page.on("request", request => {
-    if (/hero-(?:uzbekistan|united-kingdom)(?:-collage)?\.webp/.test(request.url())) {
+    if (/\/artwork\/(?:uzbek|english)-/.test(request.url())) {
       artworkRequests.push(request.url());
     }
   });
@@ -343,7 +344,7 @@ test("phones avoid downloading decorative regional artwork after language switch
     if (locale === "en") await changeLanguage(page, locale);
     const region = locale === "uz" ? "uzbekistan" : "united-kingdom";
     await expect(page.locator(".regional-hero")).toHaveAttribute("data-region", region);
-    await expect(artwork).toHaveAttribute("src", `/hero-${region}-collage.webp`);
+    await expect(artwork).toHaveAttribute("src", HERO_ARTWORK[locale].src);
     await expect(page.locator(".regional-note-start")).toBeHidden();
     await expect(page.locator(".regional-note-end")).toBeHidden();
     await expect.poll(() => artwork.evaluate(element => {
@@ -363,7 +364,7 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   page.on("response", response => {
-    if (/hero-(?:uzbekistan|united-kingdom)-collage\.webp/.test(response.url()) && !response.ok() && response.status() !== 304) {
+    if (/\/artwork\/(?:uzbek|english)-/.test(response.url()) && !response.ok() && response.status() !== 304) {
       failedArtworkResponses.push(`${response.status()} ${response.url()}`);
     }
   });
@@ -390,9 +391,10 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
         await page.evaluate(() => document.fonts.ready);
         const artwork = page.locator(".regional-artwork");
         const image = artwork.locator("img.regional-collage");
-        const region = locale === "uz" ? "uzbekistan" : "united-kingdom";
         await expect(image).toBeVisible();
-        await expect(image).toHaveAttribute("src", `/hero-${region}-collage.webp`);
+        await expect(artwork).toHaveAttribute("data-artwork-locale", locale);
+        await expect(artwork).toHaveAttribute("data-artwork-state", "ready");
+        await expect(image).toHaveAttribute("src", HERO_ARTWORK[locale].src);
         await image.evaluate(element => (element as HTMLImageElement).decode());
         expect(await image.evaluate(element => ({
           loaded: (element as HTMLImageElement).complete && (element as HTMLImageElement).naturalWidth > 0,

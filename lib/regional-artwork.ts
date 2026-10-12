@@ -1,7 +1,9 @@
+import { HERO_ARTWORK } from "./hero-artwork";
+
 /** Decorative photo-based collages, never fact-checking evidence. */
 export const REGIONAL_ARTWORK = {
   uz: {
-    src: "/hero-uzbekistan-collage.webp",
+    src: HERO_ARTWORK.uz.src,
     author: "Bernard Gagnon",
     source: "https://commons.wikimedia.org/wiki/File:Registan_01.jpg",
     license: "CC0 1.0",
@@ -10,7 +12,7 @@ export const REGIONAL_ARTWORK = {
     adaptation: "AI yordamida kollajga moslashtirilgan",
   },
   en: {
-    src: "/hero-united-kingdom-collage.webp",
+    src: HERO_ARTWORK.en.src,
     author: "Jdforrester / Cakelot1",
     source: "https://commons.wikimedia.org/wiki/File:Palace_of_Westminster_-_wide_panorama_shot_from_Albert_Embankment,_March_2024_(cropped).jpg",
     license: "CC BY 4.0",

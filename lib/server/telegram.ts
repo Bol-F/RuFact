@@ -21,8 +21,17 @@ function createStore(botToken: string): TelegramStore {
     const redis = redisClient;
     return {
       get: key => redis.get<string>(prefix + key),
+      getMany: keys => redis.mget<(string | null)[]>(...keys.map(key => prefix + key)),
       set: async (key, value, ttl) => { await redis.set(prefix + key, value, ttl === undefined ? undefined : { ex: ttl }); },
+      setMany: async entries => {
+        const transaction = redis.multi();
+        for (const { key, value, ttl } of entries) {
+          transaction.set(prefix + key, value, ttl === undefined ? undefined : { ex: ttl });
+        }
+        await transaction.exec();
+      },
       remove: async key => { await redis.del(prefix + key); },
+      removeMany: async keys => { await redis.del(...keys.map(key => prefix + key)); },
       claim: async (key, token, ttl) => await redis.set(prefix + key, token, { nx: true, ex: ttl }) === "OK",
       release: async (key, token) => {
         await redis.eval('if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end', [prefix + key], [token]);
@@ -44,8 +53,19 @@ function createStore(botToken: string): TelegramStore {
   }
   return {
     get: async key => read(key),
+    getMany: async keys => keys.map(read),
     set: async (key, value, ttl) => { write(key, value, ttl); },
+    setMany: async entries => {
+      // Check capacity before writing so a failed local batch leaves no partial cache.
+      for (const [name, item] of localStore) if (item.expiry <= Date.now()) localStore.delete(name);
+      const additional = new Set(entries.map(entry => prefix + entry.key).filter(key => !localStore.has(key))).size;
+      if (localStore.size + additional > 2000) throw new Error("Local Telegram store is full");
+      for (const { key, value, ttl } of entries) {
+        localStore.set(prefix + key, { value, expiry: ttl === undefined ? Infinity : Date.now() + ttl * 1000 });
+      }
+    },
     remove: async key => { localStore.delete(prefix + key); },
+    removeMany: async keys => { for (const key of keys) localStore.delete(prefix + key); },
     claim: async (key, token, ttl) => {
       if (read(key)) return false;
       write(key, token, ttl);

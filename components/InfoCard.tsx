@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight } from "lucide-react";
+import { HERO_ARTWORK, HIDDEN_ARTWORK_PIXEL } from "@/lib/hero-artwork";
 
 export type InfoCardVariant = "language" | "model" | "responsibility";
 
@@ -56,14 +57,17 @@ function CardDecoration({ variant }: { variant: InfoCardVariant }) {
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -right-10 -top-16 h-40 w-56 rounded-[47%_53%_57%_43%/44%_42%_58%_56%] bg-white/35" />
         <div className="absolute -bottom-8 left-[24%] h-[8.5rem] w-[82%] opacity-80 [mask-image:linear-gradient(to_top,black_58%,transparent_100%)]">
+          <picture className="relative block h-full w-full">
+          <source media="(max-width: 767px)" srcSet={HIDDEN_ARTWORK_PIXEL} />
           <Image
-            src="/hero-collage.png"
+            src={HERO_ARTWORK.ru.small}
             alt=""
             fill
-            loading="eager"
+            loading="lazy"
             sizes="(max-width: 1024px) 80vw, 32vw"
             className="object-contain object-right-bottom"
           />
+          </picture>
         </div>
       </div>
     );
@@ -85,6 +89,8 @@ function CardDecoration({ variant }: { variant: InfoCardVariant }) {
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <div className="absolute -right-12 -top-14 h-40 w-56 rounded-[56%_44%_47%_53%/39%_57%_43%_61%] bg-white/38" />
       <div className="absolute -bottom-10 -right-7 h-[12.5rem] w-[58%] min-w-52 opacity-95">
+        <picture className="relative block h-full w-full">
+        <source media="(max-width: 767px)" srcSet={HIDDEN_ARTWORK_PIXEL} />
         <Image
           src="/botanical-leaves.png"
           alt=""
@@ -92,6 +98,7 @@ function CardDecoration({ variant }: { variant: InfoCardVariant }) {
           sizes="(max-width: 1024px) 48vw, 24vw"
           className="object-contain object-right-bottom"
         />
+        </picture>
       </div>
     </div>
   );
