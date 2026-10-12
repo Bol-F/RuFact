@@ -7,8 +7,15 @@ const inheritedEnvironment = Object.fromEntries(
     Boolean(entry[1]),
   ),
 );
+const useProductionServer = process.env.PLAYWRIGHT_USE_START === "1";
 const testServiceEnvironment = {
   ...inheritedEnvironment,
+  // Default CI/development tests use the in-memory limiter, never a developer's
+  // live Redis. Production smoke tests still require genuine configured Redis.
+  ...(!useProductionServer && process.env.LIVE_GEMINI_E2E !== "1" ? {
+    UPSTASH_REDIS_REST_URL: "", UPSTASH_REDIS_REST_TOKEN: "",
+    KV_REST_API_URL: "", KV_REST_API_TOKEN: "",
+  } : {}),
   TELEGRAM_BOT_TOKEN: "playwright-bot-token-not-for-live-traffic",
   TELEGRAM_WEBHOOK_SECRET: "playwright-telegram-webhook-secret-at-least-32-chars",
   ML_API_JWT_SECRET: "playwright-only-service-secret-with-at-least-32-bytes",
@@ -22,7 +29,6 @@ const testServiceEnvironment = {
 };
 const webPort = process.env.PLAYWRIGHT_PORT ?? "3000";
 const baseURL = `http://localhost:${webPort}`;
-const useProductionServer = process.env.PLAYWRIGHT_USE_START === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",

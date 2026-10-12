@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { DOCUMENT_ACCEPT } from "@/lib/document-upload";
+import { detectTextLanguage } from "@/lib/text-language";
 import { ExampleChips, type TextExample } from "./ExampleChips";
 import { HistoryTrigger } from "./HistoryTrigger";
 import { useLanguage } from "./LanguageProvider";
@@ -38,6 +39,23 @@ interface TextAnalyzerProps {
 }
 
 const MAX_LENGTH = 5000;
+const uzbekRoutingCopy = {
+  uz: {
+    on: "O‘zbekcha matn bevosita Tavily → Gemini orqali tekshiriladi. Rus yoki ingliz ML modeli ishlatilmaydi.",
+    off: "O‘zbekcha matn uchun manbalar tekshiruvini yoqing. U o‘chirilgan bo‘lsa, natija tekshirilmagan bo‘lib qoladi.",
+    unavailable: "O‘zbekcha tekshiruv uchun serverda Tavily va Gemini sozlangan bo‘lishi kerak. Statistik ML modeli talab qilinmaydi.",
+  },
+  ru: {
+    on: "Узбекский текст проверяется напрямую через Tavily → Gemini, без русской или английской ML-модели.",
+    off: "Для узбекского текста включите проверку источников. Пока она выключена, результат останется непроверенным.",
+    unavailable: "Для узбекской проверки нужны настроенные на сервере Tavily и Gemini. Статистическая ML-модель не требуется.",
+  },
+  en: {
+    on: "Uzbek text is checked directly through Tavily → Gemini, without the Russian or English ML models.",
+    off: "Enable source checking for Uzbek text. With it switched off, the result remains unverified.",
+    unavailable: "Uzbek checks need Tavily and Gemini configured on the server. A statistical ML model is not required.",
+  },
+} as const;
 
 export function TextAnalyzer({
   text,
@@ -63,6 +81,7 @@ export function TextAnalyzer({
 }: TextAnalyzerProps) {
   const isBusy = isLoading || isExtracting;
   const { locale, copy } = useLanguage();
+  const isUzbekText = detectTextLanguage(text) === "uz";
 
   return (
     <article
@@ -268,9 +287,9 @@ export function TextAnalyzer({
         </p>
       </section>
 
-      {locale !== "ru" ? (
-        <p className="mt-2 rounded-[10px] border border-[#ead8b7] bg-[#fff8e9] px-3 py-2 text-[0.5625rem] leading-[1.4] text-[#7d6236] sm:text-[0.65625rem]">
-          {copy.analyzer.languageNotice}
+      {isUzbekText || locale !== "ru" ? (
+        <p data-uzbek-routing={isUzbekText ? "source-only" : undefined} className="mt-2 rounded-[10px] border border-[#ead8b7] bg-[#fff8e9] px-3 py-2 text-[0.5625rem] leading-[1.4] text-[#7d6236] sm:text-[0.65625rem]">
+          {isUzbekText ? uzbekRoutingCopy[locale][!geminiConfigured ? "unavailable" : useGemini ? "on" : "off"] : copy.analyzer.languageNotice}
         </p>
       ) : null}
 

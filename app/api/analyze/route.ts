@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 
-import {
-  type AnalysisLabel,
-  type AnalysisResponse,
-} from "@/lib/api";
+import type { AnalysisResponse } from "@/lib/api";
 import type {
-  GeminiReview,
   GeminiReviewUnavailable,
 } from "@/lib/gemini-review";
 import {
@@ -20,6 +16,8 @@ import {
 } from "@/lib/server/rate-limit";
 import { createAbortScope } from "@/lib/server/abort-scope";
 import { isAppLocale, type AppLocale } from "@/lib/i18n";
+import type { TextLanguage } from "@/lib/text-language";
+import { resolveAnalysis } from "@/lib/server/analysis-routing";
 
 const MAX_TEXT_LENGTH = 5_000;
 const MAX_BODY_BYTES = 24_000;
@@ -164,33 +162,17 @@ async function getRateLimitedGeminiAssessment(
   request: Request,
   text: string,
   locale: AppLocale,
+  inputLanguage: TextLanguage,
 ) {
   if (!isGeminiReviewConfigured()) {
-    return getGeminiAssessment(text, locale, request.signal);
+    return getGeminiAssessment(text, locale, request.signal, inputLanguage);
   }
 
   const sourceLimit = await rateLimitInternetRequest(request);
   if (!sourceLimit.configured) return unavailable("search-error");
   if (!sourceLimit.allowed) return unavailable("search-rate-limited");
 
-  return getGeminiAssessment(text, locale, request.signal);
-}
-
-function attachAgreement(
-  assessment: Awaited<ReturnType<typeof getGeminiAssessment>>,
-  primaryLabel: AnalysisLabel,
-): GeminiReview {
-  if (assessment.status === "unavailable") {
-    return assessment;
-  }
-
-  return {
-    ...assessment,
-    agreesWithPrimary:
-      assessment.label === "UNSURE" || primaryLabel === "UNSURE"
-        ? null
-        : assessment.label === primaryLabel,
-  };
+  return getGeminiAssessment(text, locale, request.signal, inputLanguage);
 }
 
 export async function POST(request: Request) {
@@ -286,33 +268,13 @@ export async function POST(request: Request) {
 
   const mlEndpoint = process.env.ML_API_URL?.trim();
 
-  const geminiPromise = useGemini
-    ? getRateLimitedGeminiAssessment(request, normalizedText, locale).catch(() =>
-        unavailable("upstream-error"),
-      )
-    : Promise.resolve(null);
-
-  const [mlResult, geminiAssessment] = await Promise.all([
-    mlEndpoint ? requestMlPrediction(mlEndpoint, normalizedText, request.signal)
-      : Promise.resolve({ ok: false as const, status: 503 as const,
-          message: "No trained statistical model is currently available." }),
-    geminiPromise,
-  ]);
-
-  const statisticalResult: AnalysisResponse = mlResult.ok ? mlResult.payload : {
-    label: "UNSURE", confidence: 0, signals: [], evidence: [],
-    meta: { engine: "unavailable", engineVersion: "no-statistical-model", externalSourcesChecked: false },
-  };
-
-  if (!geminiAssessment) {
-    return jsonResponse(statisticalResult);
-  }
-
-  return jsonResponse({
-    ...statisticalResult,
-    geminiReview: attachAgreement(
-      geminiAssessment,
-      statisticalResult.label,
-    ),
-  });
+  return jsonResponse(await resolveAnalysis({
+    text: normalizedText, locale, mlConfigured: Boolean(mlEndpoint),
+    useGemini: typeof useGemini === "boolean" ? useGemini : undefined,
+  }, {
+    requestMl: text => mlEndpoint ? requestMlPrediction(mlEndpoint, text, request.signal)
+      : Promise.resolve({ ok: false as const }),
+    getAssessment: (text, outputLocale, inputLanguage) =>
+      getRateLimitedGeminiAssessment(request, text, outputLocale, inputLanguage),
+  }));
 }

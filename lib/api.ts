@@ -9,6 +9,7 @@ import type {
   GeminiSource,
   GeminiUnavailableReason,
 } from "@/lib/gemini-review";
+import type { TextLanguage } from "./text-language";
 
 export type { GeminiReview } from "@/lib/gemini-review";
 
@@ -53,6 +54,7 @@ export interface AnalysisMeta {
   engineVersion: string;
   externalSourcesChecked: boolean;
   language?: "ru" | "en";
+  inputLanguage?: TextLanguage;
 }
 
 export interface AnalysisResponse {
@@ -675,13 +677,14 @@ function sanitizeAnalysisResponse(
     if (
       (meta.engine === "demo-heuristic" || meta.engine === "external-model" || meta.engine === "unavailable") &&
       typeof meta.engineVersion === "string" &&
-      meta.externalSourcesChecked === false
+      typeof meta.externalSourcesChecked === "boolean"
     ) {
       response.meta = {
         engine: meta.engine,
         engineVersion: meta.engineVersion.slice(0, 100),
         externalSourcesChecked: false,
         ...(meta.language === "ru" || meta.language === "en" ? { language: meta.language } : {}),
+        ...(meta.inputLanguage === "uz" || meta.inputLanguage === "ru" || meta.inputLanguage === "en" || meta.inputLanguage === "unknown" ? { inputLanguage: meta.inputLanguage } : {}),
       };
     }
   }

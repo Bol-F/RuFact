@@ -9,6 +9,13 @@ RuFact состоит из двух сервисов:
 Браузер никогда не обращается к FastAPI или Gemini напрямую. `ML_API_URL`, JWT,
 Redis token и Gemini key остаются только на сервере.
 
+Для узбекского распознанного текста Next.js вызывает только Tavily → Gemini,
+без FastAPI или ML JWT. Достаточно существующих серверных `GEMINI_REVIEW_ENABLED=true`,
+`GEMINI_API_KEY`, `GEMINI_MODEL`, `TAVILY_API_KEY` и production Redis/rate-limit
+настроек. Дополнительный узбекский API-ключ или переобучение модели не нужны.
+После обновления Next.js на Vercel узбекский маршрут работает независимо от Render;
+русскому и английскому статистическому анализу по-прежнему нужен ML-сервис.
+
 Telegram работает в том же Next.js сервисе через `POST /api/telegram/webhook`.
 Для активации добавьте `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` и
 `TELEGRAM_WEB_APP_URL` в Vercel Production, redeploy, затем зарегистрируйте

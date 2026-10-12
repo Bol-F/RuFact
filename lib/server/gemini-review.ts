@@ -8,6 +8,7 @@ import {
 } from "./gemini-review-core";
 import { requestTavilyEvidence } from "./tavily-search";
 import type { AppLocale } from "../i18n";
+import { detectTextLanguage, type TextLanguage } from "../text-language";
 
 const ALLOWED_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_MODEL,
@@ -47,6 +48,7 @@ export async function getGeminiAssessment(
   text: string,
   locale: AppLocale = "uz",
   signal?: AbortSignal,
+  inputLanguage: TextLanguage = detectTextLanguage(text),
 ): Promise<GeminiAssessment> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!isEnabled() || !apiKey) return unavailable("not-configured");
@@ -56,7 +58,7 @@ export async function getGeminiAssessment(
 
   const search = await requestTavilyEvidence({
     text,
-    locale,
+    locale: inputLanguage === "unknown" ? locale : inputLanguage,
     apiKey: tavilyApiKey,
     signal,
   });

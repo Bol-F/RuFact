@@ -202,11 +202,11 @@ export function ResultExplanation({ result, analyzedText }: ResultExplanationPro
           ) : null}
         </AnimatePresence>
         </div>
-      ) : (
-        <p className="mt-3 rounded-[12px] border border-[#d8dfe4] bg-white/35 px-4 py-3 text-[0.6875rem] leading-[1.5] text-[#6d7886]">
+      ) : result.meta?.engine !== "unavailable" ? (
+        <p data-statistical-placeholder className="mt-3 rounded-[12px] border border-[#d8dfe4] bg-white/35 px-4 py-3 text-[0.6875rem] leading-[1.5] text-[#6d7886]">
           {copy.result.signalsUnavailable}
         </p>
-      )}
+      ) : null}
 
       {sourceReview ? (
         <section
