@@ -2,7 +2,64 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { detectTextLanguage } from "../lib/text-language.ts";
 import { resolveAnalysis } from "../lib/server/analysis-routing.ts";
-import { analyzeText, getPublicVerdict } from "../lib/api.ts";
+import { analyzeText, getCalculationAnalysis, getPublicVerdict } from "../lib/api.ts";
+
+test("whole arithmetic equations bypass every model/source dependency in all UI locales", async () => {
+  for (const locale of ["uz", "ru", "en"]) {
+    for (const text of ["2+2=4", "2+2=5", "0.1+0.2=0.3", "1/3=2/6"]) {
+      for (const useGemini of [undefined, true, false]) {
+        const result = await resolveAnalysis({ text, locale, useGemini, mlConfigured: false }, {
+          requestMl: async () => { assert.fail("Arithmetic must not call ML"); },
+          getAssessment: async () => { assert.fail("Arithmetic must not call search or Gemini"); },
+        });
+        assert.deepEqual(result, getCalculationAnalysis(text, locale));
+        assert.equal(result.geminiReview, undefined);
+        assert.equal(result.meta.externalSourcesChecked, false);
+        assert.equal(result.meta.engine, "calculation");
+        assert.equal(getPublicVerdict(result).confidence, null);
+        assert.equal(getPublicVerdict(result).label, text === "2+2=5" ? "FAKE" : "REAL");
+      }
+    }
+  }
+});
+
+test("invalid math or math inside a factual paragraph never replaces source verification", async () => {
+  for (const text of ["2+2=4. The earth is flat.", "1/0=0", "2+2=4 or 2+2=5"]) {
+    let assessments = 0;
+    const result = await resolveAnalysis({ text, locale: "en", useGemini: true, mlConfigured: false }, {
+      requestMl: async () => { assert.fail("No model configured"); },
+      getAssessment: async () => { assessments += 1; return { status: "unavailable", provider: "gemini", reason: "no-search-results" }; },
+    });
+    assert.equal(assessments, 1);
+    assert.equal(result.calculation, undefined);
+    assert.equal(getPublicVerdict(result).label, "UNSURE");
+  }
+});
+
+test("client recomputes math and rejects spoofed correctness, probabilities, sources and mismatched text", async () => {
+  const originalFetch = globalThis.fetch;
+  const valid = getCalculationAnalysis("2+2=5", "en");
+  try {
+    globalThis.fetch = async () => Response.json({ ...valid, explanation: "Incorrect stale server description" });
+    const result = await analyzeText("2+2=5", { locale: "en", useGemini: true });
+    assert.deepEqual(result, valid);
+    assert.equal(result.sourceReview, undefined);
+    for (const invalid of [
+      { ...valid, label: "REAL" }, { ...valid, confidence: 1 },
+      { ...valid, calculation: { ...valid.calculation, leftValue: "5", correct: true } },
+      { ...valid, calculation: { ...valid.calculation, expression: "2+2=4" } },
+      { ...valid, meta: { ...valid.meta, externalSourcesChecked: true } },
+      { ...valid, geminiReview: { status: "unavailable", provider: "gemini", reason: "not-configured" } },
+      { ...valid, meta: { ...valid.meta, engine: "external-model" } },
+    ]) {
+      globalThis.fetch = async () => Response.json(invalid);
+      await assert.rejects(() => analyzeText("2+2=5"), /invalid shape/);
+    }
+    globalThis.fetch = async () => Response.json(valid);
+    await assert.rejects(() => analyzeText("2+2=4"), /invalid shape/);
+    await assert.rejects(() => analyzeText("2+2=5 and a fake claim"), /invalid shape/);
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test("Uzbek routing accepts both alphabets and common apostrophe variants", () => {
   for (const apostrophe of ["'", "‘", "’", "ʻ", "ʼ", "`", "´"]) {

@@ -1,5 +1,6 @@
 import type { AppLocale } from "./i18n";
 import type { ChatMessage, ChatReply } from "./chat";
+import { arithmeticCopy, arithmeticExplanation, evaluateArithmeticClaim } from "./arithmetic.ts";
 
 const patterns = {
   identity: /^(?:who are you|what are you|кто ты|кто вы|ты кто|sen kimsan|siz kimsiz|kimsan|сен кимсан|сиз кимсиз|кимсан)$/u,
@@ -19,6 +20,21 @@ const copy = {
 export function localChatReply(messages: ChatMessage[], locale: AppLocale): Extract<ChatReply, { status: "complete" }> | null {
   const latest = messages.at(-1);
   if (latest?.role !== "user") return null;
+  const calculation = evaluateArithmeticClaim(latest.content);
+  if (calculation) {
+    const detail = arithmeticCopy[locale];
+    return {
+      status: "complete",
+      text: [
+        calculation.correct ? detail.correct : detail.incorrect,
+        `${detail.original}: ${calculation.expression}`,
+        arithmeticExplanation(calculation, locale),
+        ...(calculation.correction ? [`${detail.correction}: ${calculation.correction}`] : []),
+        detail.note,
+      ].join("\n\n"),
+      sources: [],
+    };
+  }
   const text = latest.content.trim().toLowerCase().replace(/[?!.,…]+$/u, "").trim();
   for (const [kind, pattern] of Object.entries(patterns)) {
     if (pattern.test(text)) {

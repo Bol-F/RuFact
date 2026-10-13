@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Redis } from "@upstash/redis";
-import { botCopy, formatTelegramAssessment, formatTelegramChat, handleTelegramMessage, parseTelegramUpdate, verifyTelegramSecret } from "../lib/server/telegram-core.ts";
+import { botCopy, formatTelegramAssessment, formatTelegramCalculation, formatTelegramChat, handleTelegramMessage, parseTelegramUpdate, verifyTelegramSecret } from "../lib/server/telegram-core.ts";
 import { telegramKeyboard, telegramNotice } from "../lib/server/telegram-ui.ts";
+import { arithmeticCopy, evaluateArithmeticClaim } from "../lib/arithmetic.ts";
 
 const message = { updateId: 1, chatId: 123, messageId: 42, text: "Ўзбекистон пойтахти Тошкент.", language: "uz" };
 const assessment = {
@@ -41,6 +42,104 @@ function harness() {
   };
   return { deps, values, sent, assessed, limits, ttls, operations };
 }
+
+test("Telegram arithmetic checks bypass only the internet budget and return exact reasons and corrections", async () => {
+  for (const locale of ["en", "ru", "uz"]) {
+    const { deps, sent, assessed, limits } = harness();
+    deps.assess = async () => { throw new Error("Arithmetic must not use sources"); };
+    const normalLimit = deps.limit;
+    deps.limit = async (identifier, internet) => {
+      assert.equal(internet, false, "Provider budget must not be charged for calculations");
+      return normalLimit(identifier, internet);
+    };
+    await handleTelegramMessage({ ...message, text: "2+2=4", language: locale }, deps);
+    await handleTelegramMessage({ ...message, updateId: 2, text: "/check 2+2=5", language: locale }, deps);
+    assert.ok(sent[0].text.includes(arithmeticCopy[locale].correct));
+    assert.ok(sent[1].text.includes(arithmeticCopy[locale].incorrect));
+    assert.ok(sent[1].text.includes("2+2=5"));
+    assert.ok(sent[1].text.includes("2+2 = 4"));
+    assert.ok(sent[1].text.includes(arithmeticCopy[locale].note));
+    assert.doesNotMatch(sent[1].text, /%|<a |Tavily|Gemini|UNSURE/u);
+    assert.equal(sent[1].chatMode, false);
+    assert.equal(assessed.length, 0);
+    assert.equal(limits.length, 2);
+  }
+});
+
+test("arithmetic never bypasses Telegram's general abuse limit or protection outages", async () => {
+  const { deps, sent, assessed } = harness();
+  deps.limit = async (_identifier, internet) => {
+    assert.equal(internet, false);
+    return { allowed: false, configured: true };
+  };
+  await handleTelegramMessage({ ...message, text: "2+2=4" }, deps);
+  assert.equal(sent[0].text, telegramNotice(botCopy.uz.limited));
+  deps.limit = async () => ({ allowed: false, configured: false });
+  await assert.rejects(handleTelegramMessage({ ...message, updateId: 2, text: "2+2=5" }, deps), /protection unavailable/u);
+  assert.equal(assessed.length, 0);
+});
+
+test("Telegram calculations have bounded escaped multilingual formatting with no fabricated sources", () => {
+  for (const locale of ["en", "ru", "uz"]) {
+    const result = evaluateArithmeticClaim("(1/3 + 1/6) = 1");
+    const html = formatTelegramCalculation(result, locale);
+    assert.ok(html.includes(arithmeticCopy[locale].title));
+    assert.ok(html.includes(arithmeticCopy[locale].original));
+    assert.ok(html.includes(arithmeticCopy[locale].why));
+    assert.ok(html.includes("(1/3 + 1/6) = 0.5"));
+    assert.ok(html.length < 4096);
+    assert.doesNotMatch(html, /%|<a |Tavily|Gemini/u);
+  }
+  const poisoned = formatTelegramCalculation({
+    ...evaluateArithmeticClaim("2+2=5"), expression: "<b>wrong</b>", left: "<a href='bad'>", correction: "<script>4</script>",
+  }, "en");
+  assert.match(poisoned, /&lt;b&gt;wrong&lt;\/b&gt;/u);
+  assert.match(poisoned, /&lt;script&gt;4&lt;\/script&gt;/u);
+  assert.doesNotMatch(poisoned, /<a href='bad'>|<script>/u);
+});
+
+test("arithmetic delivery retries reuse the cached result without charging a second request", async () => {
+  const { deps, limits, sent, assessed, values } = harness();
+  const original = deps.send;
+  const incoming = { ...message, text: "2+2=5", language: "en" };
+  deps.send = async () => { throw new Error("Offline"); };
+  await assert.rejects(handleTelegramMessage(incoming, deps));
+  assert.ok(values.get("update:1:reply").includes("2+2 = 4"));
+  deps.send = original;
+  await handleTelegramMessage(incoming, deps);
+  assert.equal(limits.length, 1);
+  assert.equal(assessed.length, 0);
+  assert.equal(sent.length, 1);
+  assert.equal(await handleTelegramMessage(incoming, deps), "duplicate");
+});
+
+test("Telegram AI chat answers arithmetic locally and keeps its normal conversation lifecycle", async () => {
+  const { deps, values, sent, assessed, limits, ttls } = harness();
+  let calls = 0;
+  deps.chat = async () => { calls++; return { status: "complete", text: "Factual answer", sources: assessment.sources }; };
+  await handleTelegramMessage({ ...message, text: "/chat 2+2=5", language: "en" }, deps);
+  await handleTelegramMessage({ ...message, updateId: 2, text: "0.1+0.2=0.3", language: "en" }, deps);
+  assert.equal(calls, 0);
+  assert.equal(assessed.length, 0);
+  assert.equal(limits.filter(limit => limit.internet).length, 0);
+  assert.equal(values.get("mode:hashed-123"), "chat");
+  assert.equal(JSON.parse(values.get("chat:hashed-123")).length, 4);
+  assert.equal(ttls.get("chat:hashed-123"), 1800);
+  assert.ok(sent[0].text.includes("2+2 = 4"));
+  assert.doesNotMatch(sent[0].text, /%|<a |Sources/u);
+  await handleTelegramMessage({ ...message, updateId: 3, text: "Tashkent is the capital of Uzbekistan?", language: "en" }, deps);
+  assert.equal(calls, 1);
+  assert.equal(limits.filter(limit => limit.internet).length, 1);
+});
+
+test("unsupported equations and mixed claims still use Telegram's source-check route", async () => {
+  for (const text of ["2+2=4 and Samarkand is the capital.", "1/0=0", "2^3=8"]) {
+    const { deps, assessed, limits } = harness();
+    await handleTelegramMessage({ ...message, text }, deps);
+    assert.deepEqual(assessed, [{ text, locale: "uz" }]);
+    assert.equal(limits.filter(limit => limit.internet).length, 1);
+  }
+});
 
 test("webhook requires a strong exact shared secret", () => {
   const secret = "telegram-test-secret-at-least-32-chars";

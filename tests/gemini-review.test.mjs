@@ -111,6 +111,9 @@ test("sends a server-authenticated structured request and parses a valid review"
   assert.equal(headers.get("content-type"), "application/json");
   assert.equal(bodyText.includes(TEST_KEY), false);
   assert.equal(body.tools, undefined);
+  assert.equal(body.generationConfig.temperature, undefined);
+  assert.equal(body.generationConfig.topP, undefined);
+  assert.equal(body.generationConfig.topK, undefined);
   assert.equal(
     body.generationConfig.responseFormat.text.mimeType,
     "APPLICATION_JSON",
@@ -171,6 +174,27 @@ test("maps safety blocking to a typed unavailable result", async () => {
 
   assert.equal(result.status, "unavailable");
   assert.equal(result.reason, "blocked");
+});
+
+test("a directly evidenced supported claim produces REAL instead of a stale UNSURE headline", async () => {
+  const original = "Tashkent is the capital of Uzbekistan.";
+  const content = "Tashkent is the capital of Uzbekistan. The reference states this explicitly.";
+  const result = await requestGeminiAssessment({
+    text: original, locale: "en", apiKey: TEST_KEY, model: DEFAULT_GEMINI_MODEL,
+    evidence: { query: original, sources: [{ id: "source-1", title: "Reference", url: "https://example.org/reference", content }] },
+    fetchImpl: async () => Response.json(successfulEnvelope({
+      label: "UNSURE", certainty: "high", coverage: "complete",
+      explanation: "There is insufficient information for any confident conclusion.", warningSigns: [],
+      claims: [{ quote: original.slice(0, -1), kind: "FACTUAL", assessment: "SUPPORTED",
+        explanation: "The supplied reference explicitly names Tashkent as Uzbekistan's capital.",
+        evidence: [{ sourceId: "source-1", quote: original }], correction: null }],
+    })),
+  });
+  assert.equal(result.status, "complete");
+  assert.equal(result.label, "REAL");
+  assert.equal(result.claims[0].quote, original);
+  assert.match(result.explanation, /sources support/u);
+  assert.doesNotMatch(result.explanation, /insufficient information/u);
 });
 
 test("rejects malformed or schema-breaking model output", async () => {

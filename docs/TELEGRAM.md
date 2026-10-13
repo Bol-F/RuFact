@@ -2,6 +2,11 @@
 
 The bot checks pasted and forwarded text using the same server-side Tavily search and Gemini assessment as the website. It returns a verdict, explanation, claims and source URLs, and offers a separate source-grounded AI chat mode. Uzbek Latin and Cyrillic, Russian and English are supported. It does not present the Russian statistical model's accuracy as multilingual fact-checking accuracy.
 
+Whole supported arithmetic equations are a local exception: `2+2=4` is confirmed,
+and `2+2=5` is contradicted with the correction `2+2 = 4`. The exact bounded
+calculator also works in chat mode. These replies contain no invented sources or
+probabilities and use no search/Gemini quota; general abuse limits still apply.
+
 ## Create the bot
 
 1. Open the official [@BotFather](https://t.me/BotFather) in Telegram, send `/newbot`, choose a display name and an available username ending in `bot`.

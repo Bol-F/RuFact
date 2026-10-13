@@ -2,6 +2,68 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildAnalysisReport } from "../lib/analysis-report.ts";
+import { arithmeticCopy, arithmeticExplanation, evaluateArithmeticClaim } from "../lib/arithmetic.ts";
+
+test("calculation reports preserve the exact equation, explain it and correct false arithmetic in every locale", () => {
+  for (const locale of ["en", "ru", "uz"]) {
+    for (const [equation, correct] of [["2+2=4", true], ["2+2=5", false], ["0.1+0.2=0.3", true]]) {
+      const calculation = evaluateArithmeticClaim(equation);
+      const report = buildAnalysisReport({
+        analyzedText: equation, timestamp: "now", locale,
+        result: { label: "UNSURE", confidence: 0.99, calculation,
+          meta: { engine: "calculation", engineVersion: "arithmetic-v1", externalSourcesChecked: false } },
+      });
+      assert.ok(report.includes(arithmeticCopy[locale].title));
+      assert.ok(report.includes(correct ? arithmeticCopy[locale].correct : arithmeticCopy[locale].incorrect));
+      assert.ok(report.includes(`${arithmeticCopy[locale].original}: ${equation}`));
+      assert.ok(report.includes(arithmeticExplanation(calculation, locale)));
+      assert.ok(report.includes(arithmeticCopy[locale].note));
+      assert.ok(report.includes(arithmeticCopy[locale].scope));
+      if (!correct) assert.ok(report.includes(`${arithmeticCopy[locale].correction}: 2+2 = 4`));
+      assert.doesNotMatch(report, /%|UNSURE|Tavily|Gemini|GEMINI|STATISTICAL|probabilistic|вероятност|ehtimol/iu);
+      assert.ok(report.endsWith("\n"));
+    }
+  }
+});
+
+test("calculation reports never mix in unrelated model scores, search reviews or statistical signals", () => {
+  const report = buildAnalysisReport({
+    analyzedText: "2+2=5", timestamp: "now", locale: "en",
+    result: {
+      label: "REAL", confidence: 0.91, calculation: evaluateArithmeticClaim("2+2=5"),
+      meta: { engine: "calculation", engineVersion: "arithmetic-v1", externalSourcesChecked: false },
+      geminiReview: sourceReview(),
+      signals: [{ id: "ignored", title: "Suspicious prose", description: "Should not appear", tone: "risk", severity: "high", evidenceIds: [] }],
+    },
+  });
+  assert.match(report, /Result: Incorrect equation/u);
+  assert.match(report, /Correct equation: 2\+2 = 4/u);
+  assert.doesNotMatch(report, /%|TAVILY|GEMINI|Suspicious prose|Should not appear|Constitution|Samarkand/u);
+});
+
+test("calculation reports recompute equations instead of trusting tampered stored labels and values", () => {
+  const report = buildAnalysisReport({
+    analyzedText: "2+2=5", timestamp: "now", locale: "en",
+    result: {
+      label: "REAL", confidence: 1,
+      calculation: { ...evaluateArithmeticClaim("2+2=5"), correct: true, leftValue: "5", correction: "2+2 = 5" },
+      meta: { engine: "calculation", engineVersion: "arithmetic-v1", externalSourcesChecked: false },
+    },
+  });
+  assert.match(report, /Result: Incorrect equation/u);
+  assert.match(report, /Correct equation: 2\+2 = 4/u);
+  assert.doesNotMatch(report, /%|Result: Correct equation|Correct equation: 2\+2 = 5/u);
+});
+
+test("calculation reports use the analyzed text, never an unrelated supplied equation", () => {
+  const result = { label: "REAL", confidence: 0, calculation: evaluateArithmeticClaim("2+2=4"),
+    meta: { engine: "calculation", engineVersion: "arithmetic-v1", externalSourcesChecked: false } };
+  const report = buildAnalysisReport({ analyzedText: "2+2=5", result, locale: "en", timestamp: "now" });
+  assert.match(report, /Result: Incorrect equation/);
+  assert.match(report, /Your equation: 2\+2=5/);
+  assert.throws(() => buildAnalysisReport({ analyzedText: "2+2=4 and a false claim", result,
+    locale: "en", timestamp: "now" }), /unsupported arithmetic claim/);
+});
 
 test("builds a plain-text report with claims and safety wording", () => {
   const report = buildAnalysisReport({

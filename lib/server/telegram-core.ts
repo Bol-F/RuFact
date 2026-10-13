@@ -7,6 +7,7 @@ import { localChatReply } from "../chat-local.ts";
 import { claimCopy } from "../claim-copy.ts";
 import { deriveClaimLabel, resolveClaimEvidence, safeSourceHref } from "../claim-evidence.ts";
 import type { GeminiClaim } from "../gemini-review";
+import { arithmeticCopy, arithmeticExplanation, evaluateArithmeticClaim, type ArithmeticClaimResult } from "../arithmetic.ts";
 
 export interface TelegramMessage {
   updateId: number;
@@ -143,6 +144,18 @@ export function formatTelegramAssessment(result: GeminiAssessment, locale: AppLo
   return [...sections, footer].join("\n\n");
 }
 
+export function formatTelegramCalculation(result: ArithmeticClaimResult, locale: AppLocale) {
+  const copy = arithmeticCopy[locale];
+  return [
+    `<b>🧮 RuFact · ${escapeTelegramHtml(copy.title)}</b>`,
+    `<b>${result.correct ? "✅" : "❌"} ${escapeTelegramHtml(result.correct ? copy.correct : copy.incorrect)}</b>`,
+    `<b>${escapeTelegramHtml(copy.original)}:</b> ${escapeTelegramHtml(result.expression)}`,
+    `<b>${escapeTelegramHtml(copy.why)}:</b> ${escapeTelegramHtml(arithmeticExplanation(result, locale))}`,
+    ...(result.correction ? [`<b>${escapeTelegramHtml(copy.correction)}:</b> ${escapeTelegramHtml(result.correction)}`] : []),
+    `<i>${escapeTelegramHtml(copy.note)}</i>`,
+  ].join("\n\n");
+}
+
 export interface TelegramStore {
   get(key: string): Promise<string | null>;
   getMany(keys: string[]): Promise<(string | null)[]>;
@@ -245,7 +258,7 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
           chatMode = false;
           reply = botCopy[locale].forgotten;
         } else if (command === "privacy") {
-          reply = botCopy[locale].privacy;
+          reply = `${botCopy[locale].privacy}\n\n${arithmeticCopy[locale].title}: ${arithmeticCopy[locale].note}`;
         } else if (command && command !== "check" && command !== "chat") {
           reply = `${botCopy[locale].welcome}\n\n💬 /chat — AI chat\n🔎 /check — ${telegramUi[locale].check}\n🧹 /new — ${telegramUi[locale].clear}\n⏹ /stop — ${telegramUi[locale].stop}`;
         } else {
@@ -262,7 +275,8 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
           else if (text.length > (chatMode ? 2000 : 5000)) reply = chatMode ? (locale === "ru" ? "Максимум 2000 символов в AI-чате." : locale === "en" ? "Maximum 2000 characters in AI chat." : "AI chatda ko‘pi bilan 2000 belgi.") : botCopy[locale].tooLong;
           else {
             const local = chatMode ? localChatReply([{ role: "user", content: text }], locale) : null;
-            const limit = local ? { allowed: true, configured: true } : await deps.limit(identifier, true);
+            const calculation = !chatMode ? evaluateArithmeticClaim(text) : null;
+            const limit = local || calculation ? { allowed: true, configured: true } : await deps.limit(identifier, true);
             if (!limit.configured) throw new Error("Telegram protection unavailable");
             if (!limit.allowed) reply = botCopy[locale].limited;
             else {
@@ -282,7 +296,8 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
                 if (result.status === "complete") {
                   await deps.store.set(historyKey, JSON.stringify([...messages, { role: "assistant", content: result.text.slice(0, 2000) }].slice(-6)), 1800);
                 }
-              } else reply = formatTelegramAssessment(await deps.assess(text, locale), locale);
+              } else reply = calculation ? formatTelegramCalculation(calculation, locale)
+                : formatTelegramAssessment(await deps.assess(text, locale), locale);
             }
           }
         }

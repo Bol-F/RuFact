@@ -382,6 +382,9 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
   for (const width of [1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/");
+    // Finish the persisted-preference/hydration cycle before clicking SSR controls.
+    await changeLanguage(page, "ru");
+    await changeLanguage(page, "uz");
     for (const size of ["normal", "larger"] as const) {
       await page.locator(".site-footer .text-size-control button").nth(size === "normal" ? 0 : 2).click();
       await expect(page.locator("html")).toHaveAttribute("data-text-size", size);

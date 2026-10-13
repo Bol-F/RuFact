@@ -4,9 +4,50 @@ import { parseChatMessages, recentChatMessages, safeChatSources } from "../lib/c
 import { requestAiChat } from "../lib/server/ai-chat-core.ts";
 import { localChatReply } from "../lib/chat-local.ts";
 import { parseChatSession, serializeChatSession } from "../lib/chat-session.ts";
+import { arithmeticCopy } from "../lib/arithmetic.ts";
 
 const messages = [{ role: "user", content: "Is Tashkent the capital of Uzbekistan?" }];
 const evidence = { query: "Tashkent", sources: [{ id: "s1", title: "Official source", url: "https://example.org/source", content: "Tashkent is the capital of Uzbekistan." }] };
+
+test("whole arithmetic equations are answered exactly in local chat without search or model generation", async () => {
+  for (const locale of ["en", "ru", "uz"]) {
+    for (const [equation, correct] of [["2+2=4", true], ["2+2=5", false], ["0.1+0.2=0.3", true], ["1/3=0.33333333333", false]]) {
+      const reply = await requestAiChat([{ role: "user", content: equation }], locale, {
+        search: async () => { throw new Error("No search allowed for arithmetic"); },
+        generate: async () => { throw new Error("No generation allowed for arithmetic"); },
+      });
+      assert.equal(reply.status, "complete", equation);
+      assert.deepEqual(reply.sources, []);
+      assert.ok(reply.text.includes(correct ? arithmeticCopy[locale].correct : arithmeticCopy[locale].incorrect));
+      assert.ok(reply.text.includes(`${arithmeticCopy[locale].original}: ${equation}`));
+      assert.ok(reply.text.includes(arithmeticCopy[locale].note));
+      if (equation === "2+2=5") assert.ok(reply.text.includes("2+2 = 4"));
+      assert.doesNotMatch(reply.text, /%|\[[0-9]+\]|Tavily|Gemini/u);
+    }
+  }
+});
+
+test("local arithmetic reads only the latest complete equation and does not rewrite prose", () => {
+  const history = [...messages, { role: "assistant", content: "A factual answer." }, { role: "user", content: "２＋２＝５" }];
+  const reply = localChatReply(history, "en");
+  assert.equal(reply.status, "complete");
+  assert.ok(reply.text.includes("２＋２＝５"));
+  assert.ok(reply.text.includes("２＋２ = 4"));
+  assert.equal(localChatReply([{ role: "assistant", content: "2+2=4" }], "en"), null);
+  for (const text of ["Is 2+2=4?", "2+2=4 and Samarkand is the capital.", "2+2=4\n2+2=5", "1/0=0", "2^3=8"]) {
+    assert.equal(localChatReply([{ role: "user", content: text }], "en"), null, text);
+  }
+});
+
+test("arithmetic history is not reused as web-search context for a later factual question", async () => {
+  const history = [{ role: "user", content: "2+2=5" }, { role: "assistant", content: "Incorrect. 2+2 = 4." }, ...messages];
+  let query;
+  await requestAiChat(history, "en", {
+    search: async text => { query = text; return { ok: true, evidence }; },
+    generate: async () => "The source confirms Tashkent [1].",
+  });
+  assert.equal(query, messages[0].content);
+});
 
 test("chat accepts bounded alternating text only, never system instructions or tool parts", () => {
   assert.deepEqual(parseChatMessages(messages), messages);

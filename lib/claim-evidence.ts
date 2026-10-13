@@ -1,4 +1,5 @@
 import type { GeminiClaim, GeminiClaimEvidence, GeminiReviewLabel, GeminiSource } from "./gemini-review";
+import { restoreClaimQuote } from "./claim-text.ts";
 
 export const MAX_CLAIM_EVIDENCE = 2;
 export const MAX_EVIDENCE_QUOTE_LENGTH = 360;
@@ -27,11 +28,12 @@ export function readClaimEvidence(
     if (keys.length !== 2 || !keys.every(key => key === "sourceId" || key === "quote") ||
       typeof item.sourceId !== "string" || typeof item.quote !== "string") return null;
     const source = indexed.get(item.sourceId);
-    const quote = item.quote.trim();
+    const quote = source?.content === undefined ? item.quote.trim()
+      : restoreClaimQuote(item.quote, source.content);
     const identity = `${item.sourceId}\n${quote}`;
-    if (!source || !safeSourceHref(source) || quote.length < 10 ||
+    if (!source || !safeSourceHref(source) || quote === null || quote.length < 10 ||
       quote.length > MAX_EVIDENCE_QUOTE_LENGTH || seen.has(identity) ||
-      (source.content !== undefined && !source.content.includes(quote))) return null;
+      !item.quote.trim()) return null;
     seen.add(identity);
     result.push({ sourceId: item.sourceId, quote });
   }

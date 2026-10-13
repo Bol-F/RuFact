@@ -93,7 +93,7 @@ function hasExactKeys(record: Record<string, unknown>, expected: readonly string
 }
 
 function isAnalysisEngine(value: unknown): value is AnalysisEngine {
-  return value === "demo-heuristic" || value === "external-model" || value === "unavailable";
+  return value === "demo-heuristic" || value === "external-model" || value === "unavailable" || value === "calculation";
 }
 
 function isCanonicalIsoTimestamp(value: unknown, now: number): value is string {

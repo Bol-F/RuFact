@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { getPublicVerdict, type AnalysisResponse } from "@/lib/api";
 import { verdictCopy } from "@/lib/verdict-copy";
+import { CalculationPanel } from "./CalculationPanel";
 import { ConfidenceRing } from "./ConfidenceRing";
 import { GeminiReviewPanel } from "./GeminiReviewPanel";
 import { LoadingState } from "./LoadingState";
@@ -61,6 +62,11 @@ export function AnalysisResult({
 
   const verdict = result ? getPublicVerdict(result) : null;
   const isSource = verdict?.basis === "sources";
+  const isCalculation = verdict?.basis === "calculation";
+  const failedReview = result?.geminiReview;
+  const verificationFailure = verdict?.basis === "unavailable" && failedReview?.status === "unavailable" &&
+    ["timeout", "upstream-error", "rate-limited", "search-error", "search-rate-limited", "invalid-response"].includes(failedReview.reason)
+    ? failedReview.reason : null;
   const isUnsure = verdict?.label === "UNSURE";
   const isFake = verdict?.label === "FAKE";
   const tone = isFake ? "fake" : "real";
@@ -70,10 +76,14 @@ export function AnalysisResult({
     : "border-[#d6e7d8] bg-[linear-gradient(110deg,#eef7ef,#e3f0e5)]";
   const isDemo = result?.meta?.engine !== "external-model";
   const isLowConfidence = (result?.confidence ?? 1) < 0.6;
-  const headline = isUnsure ? verdictText.unsure : isSource ? verdict?.label
+  const headline = verificationFailure ? verdictText.checkUnavailable
+    : isCalculation ? isFake ? verdictText.calculationContradicted : verdictText.confirmed
+    : isUnsure ? verdictText.unsure : isSource ? verdict?.label
     : isFake ? verdictText.highRisk : verdictText.lowRisk;
-  const description = verdict?.basis === "unavailable" ? result?.meta?.engineVersion === "source-review-not-retained" ? verdictText.historyReview : verdictText.unavailable
-    : isSource ? isUnsure ? verdictText.insufficient : isFake ? verdictText.contradicted : verdictText.supported
+  const description = verificationFailure ? verdictText.checkFailed
+    : verdict?.basis === "unavailable" ? result?.meta?.engineVersion === "source-review-not-retained" ? verdictText.historyReview : verdictText.unavailable
+    : isCalculation ? isFake ? verdictText.calculationWrong : verdictText.calculationSupported
+      : isSource ? isUnsure ? verdictText.insufficient : isFake ? verdictText.contradicted : verdictText.supported
       : verdictText.statisticalNote;
 
   return (
@@ -108,12 +118,12 @@ export function AnalysisResult({
         {result ? <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
           <span
             className={`rounded-md px-1.5 py-0.5 text-[0.46875rem] font-extrabold uppercase tracking-[0.07em] sm:px-2 sm:py-1 sm:text-[0.5625rem] ${
-              isDemo
+              isDemo && !isCalculation
                 ? "bg-[#f3e1d4] text-[#985539]"
                 : "bg-[#dcebdd] text-[#316746]"
             }`}
           >
-            {isSource ? "Tavily + Gemini" : isUnsure ? verdictText.unsure : isDemo ? copy.result.demo : `${copy.result.model} · ${result.meta?.language?.toUpperCase() ?? "RU"}`}
+            {verificationFailure ? verdictText.checkUnavailable : isCalculation ? verdictText.calculation : isSource ? "Tavily + Gemini" : isUnsure ? verdictText.unsure : isDemo ? copy.result.demo : `${copy.result.model} · ${result.meta?.language?.toUpperCase() ?? "RU"}`}
           </span>
           <time className="max-w-[72px] text-right text-[0.5rem] leading-tight font-medium text-[#768398] sm:max-w-none sm:text-[0.6875rem]">
             {timestamp}
@@ -172,6 +182,7 @@ export function AnalysisResult({
               className={`mt-2.5 flex flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2.5 sm:mt-3 sm:gap-5 sm:rounded-[15px] sm:px-4 sm:py-3.5 ${panelClass}`}
               data-verdict-basis={verdict?.basis}
               data-verdict-label={verdict?.label}
+              data-verification-failure={verificationFailure ?? undefined}
               aria-label={`${copy.result.resultAria}: ${headline}`}
             >
               <div className="flex min-w-0 flex-1 basis-[9rem] items-center gap-2.5 sm:basis-[12rem] sm:gap-4">
@@ -208,9 +219,9 @@ export function AnalysisResult({
               <p className="mt-2 text-[0.6875rem] leading-relaxed text-[#69778c]" data-statistical-summary>
                 {verdictText.statistical}: ML · {result.meta.language?.toUpperCase() ?? "RU"} · {result.label} · {Math.round(result.confidence * 100)}%. {verdictText.statisticalNote}
               </p>
-            ) : !isSource && isLowConfidence && !isUnsure ? <p className="mt-2 text-xs text-[#8a622f]">{copy.result.lowConfidence}</p> : null}
+            ) : !isSource && !isCalculation && isLowConfidence && !isUnsure ? <p className="mt-2 text-xs text-[#8a622f]">{copy.result.lowConfidence}</p> : null}
 
-            {result.geminiReview ? (
+            {!isCalculation && result.geminiReview ? (
               <GeminiReviewPanel
                 review={result.geminiReview}
                 primaryLabel={result.label}
@@ -218,12 +229,12 @@ export function AnalysisResult({
               />
             ) : null}
 
-            <ResultExplanation result={result} analyzedText={analyzedText} />
+            {isCalculation ? <CalculationPanel result={result} /> : <ResultExplanation result={result} analyzedText={analyzedText} />}
 
             <aside className="mt-3 flex gap-2 rounded-[11px] bg-[#e7eef9] px-3 py-2.5 text-[#3c608e] sm:mt-4 sm:gap-3 sm:rounded-[13px] sm:px-4 sm:py-3">
               <Info className="mt-0.5 shrink-0" size={16} fill="#5f8ed8" color="white" aria-hidden="true" />
               <p className="text-[0.59375rem] leading-[1.45] sm:text-[0.75rem] sm:leading-[1.55]">
-                {copy.result.disclaimer}
+                {isCalculation ? verdictText.calculationDisclaimer : copy.result.disclaimer}
               </p>
             </aside>
 

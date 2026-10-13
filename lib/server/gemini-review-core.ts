@@ -12,6 +12,7 @@ import { createAbortScope } from "./abort-scope.ts";
 import { readBoundedText } from "./bounded-text.ts";
 import type { AppLocale } from "../i18n";
 import { deriveClaimLabel, MAX_CLAIM_EVIDENCE, MAX_CORRECTION_LENGTH, MAX_EVIDENCE_QUOTE_LENGTH, readClaimEvidence } from "../claim-evidence.ts";
+import { claimsCoverShortText, isSingleShortStatement, restoreClaimQuote } from "../claim-text.ts";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 export const GEMINI_PROMPT_VERSION = "misinfo-tavily-v4" as const;
@@ -202,11 +203,28 @@ function isClaimAssessment(value: unknown): value is GeminiClaimAssessment {
   );
 }
 
+/** Replace a conflicting provider headline with a conclusion from validated claims. */
+export function summarizeValidatedClaims(
+  claims: readonly GeminiClaim[], coverage: "complete" | "partial", locale: AppLocale,
+): string {
+  const label = deriveClaimLabel(claims, coverage);
+  const copy = {
+    en: { FAKE: "Retrieved sources contradict at least one factual claim.", REAL: "Retrieved sources support the checked factual claims.", UNSURE: "The checked claims have insufficient, mixed or incomplete evidence." },
+    ru: { FAKE: "Найденные источники опровергают как минимум одно фактическое утверждение.", REAL: "Найденные источники подтверждают проверенные фактические утверждения.", UNSURE: "Для проверенных утверждений доказательства недостаточны, неоднозначны или неполны." },
+    uz: { FAKE: "Topilgan manbalar kamida bitta faktik da’voni rad etadi.", REAL: "Topilgan manbalar tekshirilgan faktik da’volarni tasdiqlaydi.", UNSURE: "Tekshirilgan da’volar uchun dalillar yetarli emas, turlicha yoki to‘liq emas." },
+  };
+  const focused = claims.find(claim => claim.assessment === "CONTRADICTED")
+    ?? claims.find(claim => claim.assessment === "MIXED" || claim.assessment === "UNVERIFIED")
+    ?? claims[0];
+  return `${copy[locale][label]} ${focused?.explanation ?? ""}`.trim();
+}
+
 function parseAssessment(
   value: unknown,
   model: string,
   sourceText: string,
   evidence: TavilyEvidence,
+  locale: AppLocale,
 ): GeminiAssessmentComplete | null {
   if (!isRecord(value)) {
     return null;
@@ -271,7 +289,8 @@ function parseAssessment(
       return null;
     }
 
-    const quote = item.quote.trim();
+    const whole = isSingleShortStatement(sourceText);
+    const quote = restoreClaimQuote(item.quote, sourceText, whole);
     const claimExplanation = item.explanation.trim();
     const validPair =
       item.kind === "OPINION"
@@ -279,9 +298,8 @@ function parseAssessment(
         : item.assessment !== "NOT_APPLICABLE";
 
     if (
-      quote.length < 4 ||
+      quote === null || quote.length < 4 ||
       quote.length > MAX_CLAIM_QUOTE_LENGTH ||
-      !sourceText.includes(quote) ||
       claimExplanation.length < 10 ||
       claimExplanation.length > MAX_CLAIM_EXPLANATION_LENGTH ||
       !validPair
@@ -294,14 +312,19 @@ function parseAssessment(
       (item.kind === "OPINION" && passages.length !== 0)) return null;
     let correction: GeminiClaim["correction"] = null;
     if (item.correction !== null) {
-      if (!isRecord(item.correction) || Object.keys(item.correction).length !== 2 ||
-        !Object.keys(item.correction).every(key => key === "text" || key === "evidence") ||
-        item.kind !== "FACTUAL" || item.assessment !== "CONTRADICTED" || typeof item.correction.text !== "string") return null;
-      const text = item.correction.text.trim();
-      const correctionEvidence = readClaimEvidence(item.correction.evidence, evidence.sources);
-      if (text.length < 4 || text.length > MAX_CORRECTION_LENGTH || text === item.quote.trim() ||
-        !correctionEvidence?.length) return null;
-      correction = { text, evidence: correctionEvidence };
+      if (item.kind !== "FACTUAL" || item.assessment !== "CONTRADICTED") return null;
+      // A replacement fact is optional. Its failure must not erase a separately
+      // validated contradiction, but invalid replacements are never published.
+      if (isRecord(item.correction) && Object.keys(item.correction).length === 2 &&
+        Object.keys(item.correction).every(key => key === "text" || key === "evidence") &&
+        typeof item.correction.text === "string") {
+        const text = item.correction.text.trim();
+        const correctionEvidence = readClaimEvidence(item.correction.evidence, evidence.sources);
+        if (text.length >= 4 && text.length <= MAX_CORRECTION_LENGTH &&
+          !restoreClaimQuote(text, quote, true) && correctionEvidence?.length) {
+          correction = { text, evidence: correctionEvidence };
+        }
+      }
     }
 
     claims.push({
@@ -320,11 +343,10 @@ function parseAssessment(
 
   // For one short statement, reject entity-only quotes that omit its relationship.
   const original = sourceText.trim();
-  if (original.length <= MAX_CLAIM_QUOTE_LENGTH && !/[.!?。！？]\s+\S/u.test(original) &&
+  if (isSingleShortStatement(original) &&
     (claims.length !== 1 || claims[0].quote !== original)) return null;
+  if (value.coverage === "complete" && !claimsCoverShortText(claims.map(claim => claim.quote), original)) return null;
   const label = deriveClaimLabel(claims, value.coverage);
-  // Fail closed rather than publishing a reason/heading that disagrees with the claims.
-  if (value.label !== label) return null;
 
   return {
     status: "complete",
@@ -333,7 +355,7 @@ function parseAssessment(
     promptVersion: GEMINI_PROMPT_VERSION,
     label,
     certainty: value.certainty,
-    explanation,
+    explanation: value.label === label ? explanation : summarizeValidatedClaims(claims, value.coverage, locale),
     warningSigns,
     claims,
     coverage: value.coverage,
@@ -453,7 +475,8 @@ export async function requestGeminiAssessment({
             },
           ],
           generationConfig: {
-            temperature: 0.1,
+            // Gemini 3.x recommends default sampling; lowered temperature can cause loops.
+            // This is not a substitute for the provider deadline or evidence validation.
             maxOutputTokens: 4_096,
             // Version-matched REST documentation uses responseFormat; responseSchema is deprecated.
             responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: RESPONSE_SCHEMA } },
@@ -498,7 +521,7 @@ export async function requestGeminiAssessment({
       return unavailable("invalid-response");
     }
 
-    return parseAssessment(parsed, model, text, evidence) ?? unavailable("invalid-response");
+    return parseAssessment(parsed, model, text, evidence, locale) ?? unavailable("invalid-response");
   } catch {
     return unavailable(abortScope.signal.aborted ? "timeout" : "upstream-error");
   } finally {

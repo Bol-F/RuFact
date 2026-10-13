@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
-import { analyzeText, getMockAnalysis, type AnalysisResponse } from "@/lib/api";
+import { analyzeText, getCalculationAnalysis, getMockAnalysis, type AnalysisResponse } from "@/lib/api";
 import type { HistoryItem } from "@/lib/analysis-history";
 import { extractDocumentText } from "@/lib/document-upload";
 import { localeTags, type AppLocale } from "@/lib/i18n";
@@ -187,7 +187,19 @@ function AnalyzerWorkspaceSession({
   const handleHistoryRestore = (item: HistoryItem) => {
     if (isBusy) return;
     const restoredResult: AnalysisResponse =
-      item.meta.engine === "demo-heuristic"
+      // Compact history deliberately stores no calculation result. Recompute
+      // from the complete text rather than trusting a stored label or score.
+      item.meta.engine === "calculation"
+        ? getCalculationAnalysis(item.text, locale) ?? {
+            label: "UNSURE",
+            confidence: 0,
+            meta: {
+              engine: "unavailable",
+              engineVersion: "arithmetic-history-invalid",
+              externalSourcesChecked: false,
+            },
+          }
+        : item.meta.engine === "demo-heuristic"
         ? getMockAnalysis(item.text)
         : {
             label: item.meta.language ? item.label : "UNSURE",

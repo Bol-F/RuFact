@@ -1,4 +1,5 @@
 import type { AnalysisResponse } from "../api.ts";
+import { getCalculationAnalysis } from "../api.ts";
 import type { AppLocale } from "../i18n";
 import { detectTextLanguage, type TextLanguage } from "../text-language.ts";
 import type { GeminiAssessment } from "./gemini-review-core";
@@ -21,6 +22,9 @@ export async function resolveAnalysis(
   input: AnalysisRoutingInput,
   dependencies: AnalysisRoutingDependencies,
 ): Promise<AnalysisResponse> {
+  // HTTP abuse/body/origin guards still run first; math needs no external quota or JWT.
+  const calculation = getCalculationAnalysis(input.text, input.locale);
+  if (calculation) return calculation;
   const inputLanguage = detectTextLanguage(input.text);
   const isUzbek = inputLanguage === "uz";
   const needsSources = input.useGemini === true || (isUzbek && input.useGemini === undefined);

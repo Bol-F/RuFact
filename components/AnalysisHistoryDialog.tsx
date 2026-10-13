@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { HistoryItem } from "@/lib/analysis-history";
 import { localeTags } from "@/lib/i18n";
+import { verdictCopy } from "@/lib/verdict-copy";
 import { HISTORY_DIALOG_ID, HISTORY_TRIGGER_ID } from "./HistoryTrigger";
 import { useLanguage } from "./LanguageProvider";
 
@@ -357,15 +358,15 @@ export function AnalysisHistoryDialog({
                             <div className="flex min-w-0 items-center gap-2.5">
                               <span
                                 className={`rounded-lg px-2.5 py-1 text-[0.625rem] font-extrabold tracking-[0.06em] ${
-                                  item.label === "UNSURE" ? "bg-[#e7edf2] text-[#53667a]" : isFake
+                                  item.meta.engine === "calculation" || item.label === "UNSURE" ? "bg-[#e7edf2] text-[#53667a]" : isFake
                                     ? "bg-[#f8dddd] text-[#b5363c]"
                                     : "bg-[#dcecdf] text-[#357047]"
                                 }`}
                               >
-                                {item.label === "UNSURE" ? "—" : `ML · ${item.label}`}
+                                {item.meta.engine === "calculation" ? verdictCopy[locale].calculation : item.label === "UNSURE" ? "—" : `ML · ${item.label}`}
                               </span>
                               <span className="text-[0.75rem] font-extrabold tabular-nums text-[#29465f]">
-                                {item.label === "UNSURE" ? "" : formatConfidence(item.confidence)}
+                                {item.meta.engine === "calculation" || item.label === "UNSURE" ? "" : formatConfidence(item.confidence)}
                               </span>
                             </div>
                             <time

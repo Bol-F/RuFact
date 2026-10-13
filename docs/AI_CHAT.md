@@ -2,6 +2,12 @@
 
 Web: `/chat`. Telegram: `/chat` or the localized AI chat keyboard button. Chat explains news, claims and sources; it is not a measured classifier or a guarantee of truth. `/check` and ordinary Telegram messages outside chat mode still perform claim assessment.
 
+Whole supported arithmetic equations use the same exact bounded calculator as
+text checking, before provider availability and internet-budget checks. For example,
+`2+2=5` explains that both sides differ and gives `2+2 = 4`. Local calculation
+replies have no source URLs or probability; mixed prose and unsupported mathematics
+continue through the usual source-grounded workflow. General request limits remain.
+
 ## Configuration and quotas
 
 No new provider key is needed. Both surfaces require server-only `GEMINI_API_KEY`, the existing allowlisted `GEMINI_MODEL`, `GEMINI_REVIEW_ENABLED=true`, and `TAVILY_API_KEY`. Production additionally requires Redis REST credentials and `RATE_LIMIT_HASH_SECRET`. Telegram uses its existing token and webhook secret. Never expose secrets with `NEXT_PUBLIC_`.

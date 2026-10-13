@@ -11,13 +11,17 @@ import type {
 } from "@/lib/gemini-review";
 import type { TextLanguage } from "./text-language";
 import { deriveClaimLabel, MAX_CORRECTION_LENGTH, readClaimEvidence, safeSourceHref } from "./claim-evidence.ts";
+import { claimsCoverShortText, isSingleShortStatement, restoreClaimQuote } from "./claim-text.ts";
+import { arithmeticExplanation, evaluateArithmeticClaim, type ArithmeticClaimResult } from "./arithmetic.ts";
+import type { AppLocale } from "./i18n";
 
 export type { GeminiReview } from "@/lib/gemini-review";
 
 export type AnalysisLabel = "REAL" | "FAKE" | "UNSURE";
 export type SignalTone = "risk" | "reassuring";
 export type SignalSeverity = "low" | "medium" | "high";
-export type AnalysisEngine = "demo-heuristic" | "external-model" | "unavailable";
+export type AnalysisEngine = "demo-heuristic" | "external-model" | "unavailable" | "calculation";
+export const ARITHMETIC_ENGINE_VERSION = "arithmetic-v1";
 
 export interface EvidenceSpan {
   id: string;
@@ -67,10 +71,32 @@ export interface AnalysisResponse {
   sourceReview?: SourceReview;
   meta?: AnalysisMeta;
   geminiReview?: GeminiReview;
+  calculation?: ArithmeticClaimResult;
+}
+
+/** Whole supported equations are facts we can check exactly, without a model. */
+export function getCalculationAnalysis(text: string, locale: AppLocale): AnalysisResponse | null {
+  const calculation = evaluateArithmeticClaim(text);
+  if (!calculation) return null;
+  return {
+    label: calculation.correct ? "REAL" : "FAKE",
+    confidence: 0, // Wire compatibility only; deterministic results never display a probability.
+    explanation: arithmeticExplanation(calculation, locale),
+    calculation,
+    meta: { engine: "calculation", engineVersion: ARITHMETIC_ENGINE_VERSION,
+      externalSourcesChecked: false, inputLanguage: "unknown" },
+  };
 }
 
 /** Source evidence leads the public conclusion; a text classifier is a separate signal. */
 export function getPublicVerdict(result: AnalysisResponse) {
+  if (result.meta?.engine === "calculation") {
+    const computed = evaluateArithmeticClaim(result.calculation?.expression ?? "");
+    if (computed) return { basis: "calculation" as const, label: computed.correct ? "REAL" as const : "FAKE" as const,
+      confidence: null, certainty: null, explanation: result.explanation };
+    return { basis: "unavailable" as const, label: "UNSURE" as const,
+      confidence: null, certainty: null, explanation: undefined };
+  }
   if (result.geminiReview?.status === "complete") {
     return {
       basis: "sources" as const,
@@ -461,7 +487,7 @@ function sanitizeGeminiReview(
       return null;
     }
 
-    const quote = claim.quote.trim();
+    const quote = restoreClaimQuote(claim.quote, analyzedText, modern && isSingleShortStatement(analyzedText));
     const claimExplanation = claim.explanation.trim();
     const validPair =
       claim.kind === "OPINION"
@@ -472,9 +498,8 @@ function sanitizeGeminiReview(
       (claim.assessment === "MIXED" || claim.assessment === "UNVERIFIED");
 
     if (
-      quote.length < 4 ||
+      quote === null || quote.length < 4 ||
       quote.length > 320 ||
-      !analyzedText.includes(quote) ||
       claimExplanation.length < 10 ||
       claimExplanation.length > 500 ||
       !validPair ||
@@ -549,8 +574,9 @@ function sanitizeGeminiReview(
       }
     }
     const original = analyzedText.trim();
-    if (original.length <= 320 && !/[.!?。！？]\s+\S/u.test(original) &&
+    if (isSingleShortStatement(original) &&
       (claims.length !== 1 || claims[0].quote !== original)) return null;
+    if (review.coverage === "complete" && !claimsCoverShortText(claims.map(claim => claim.quote), original)) return null;
     if (deriveClaimLabel(claims, review.coverage as "complete" | "partial") !== review.label) return null;
   }
 
@@ -576,6 +602,7 @@ function sanitizeAnalysisResponse(
   value: unknown,
   analyzedText: string,
   defaultMeta: AnalysisMeta,
+  locale: AppLocale,
 ): AnalysisResponse | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -592,6 +619,23 @@ function sanitizeAnalysisResponse(
   ) {
     return null;
   }
+
+  if (candidate.meta && typeof candidate.meta === "object" &&
+    (candidate.meta as Record<string, unknown>).engine === "calculation") {
+    const meta = candidate.meta as Record<string, unknown>;
+    const computed = getCalculationAnalysis(analyzedText, locale);
+    if (!computed?.calculation || !candidate.calculation || typeof candidate.calculation !== "object" ||
+      Array.isArray(candidate.calculation) || candidate.label !== computed.label || candidate.confidence !== 0 ||
+      meta.engineVersion !== ARITHMETIC_ENGINE_VERSION || meta.externalSourcesChecked !== false ||
+      candidate.geminiReview !== undefined) return null;
+    const raw = candidate.calculation as Record<string, unknown>;
+    const expected = computed.calculation;
+    const keys = Object.keys(expected) as (keyof ArithmeticClaimResult)[];
+    if (Object.keys(raw).length !== keys.length || keys.some(key => raw[key] !== expected[key])) return null;
+    // Recompute from the submitted text rather than accepting provider/stored correctness.
+    return computed;
+  }
+  if (candidate.calculation !== undefined) return null;
 
   if (candidate.label === "UNSURE" && (
     candidate.confidence !== 0 || !candidate.meta || typeof candidate.meta !== "object" ||
@@ -835,6 +879,7 @@ export async function analyzeText(
       payload,
       normalizedText,
       createMeta("demo-heuristic", DEMO_ENGINE_VERSION),
+      options.locale ?? "uz",
     );
 
     if (!parsed) {

@@ -4,6 +4,7 @@ import { getPublicVerdict } from "./api.ts";
 import { verdictCopy } from "./verdict-copy.ts";
 import { claimCopy } from "./claim-copy.ts";
 import { deriveClaimLabel, resolveClaimEvidence, safeSourceHref } from "./claim-evidence.ts";
+import { arithmeticCopy, arithmeticExplanation, evaluateArithmeticClaim } from "./arithmetic.ts";
 
 interface AnalysisReportInput {
   result: AnalysisResponse;
@@ -22,6 +23,33 @@ export function buildAnalysisReport({
   timestamp,
   locale = "ru",
 }: AnalysisReportInput) {
+  const calculation = result.meta?.engine === "calculation"
+    ? evaluateArithmeticClaim(analyzedText) : null;
+  if (result.meta?.engine === "calculation" && !calculation) {
+    throw new Error("Cannot export an unsupported arithmetic claim.");
+  }
+  if (calculation) {
+    const detail = arithmeticCopy[locale];
+    const reportCopy = {
+      en: { report: "RUFACT REPORT", date: "Analysis date", result: "Result" },
+      ru: { report: "ОТЧЁТ RUFACT", date: "Дата анализа", result: "Результат" },
+      uz: { report: "RUFACT HISOBOTI", date: "Tahlil sanasi", result: "Natija" },
+    }[locale];
+    return [
+      reportCopy.report,
+      `${reportCopy.date}: ${timestamp}`,
+      detail.title,
+      `${reportCopy.result}: ${calculation.correct ? detail.correct : detail.incorrect}`,
+      "",
+      `${detail.original}: ${calculation.expression}`,
+      `${detail.why}: ${arithmeticExplanation(calculation, locale)}`,
+      ...(calculation.correction ? [`${detail.correction}: ${calculation.correction}`] : []),
+      "",
+      detail.note,
+      detail.scope,
+      "",
+    ].join("\n");
+  }
   const copy = locale === "uz"
     ? { report: "RUFACT HISOBOTI", date: "Tahlil sanasi", result: "Natija", confidence: "Ushbu javobga model ishonchi", interpretation: "Talqin", fake: "Ishonchsiz axborot belgilari aniqlandi", real: "Yaqqol ishonchsizlik belgilari aniqlanmadi", text: "TAHLIL QILINGAN MATN", why: "NEGA", signals: "STATISTIK BELGILAR", review: "GEMINI MANBA TEKSHIRUVI", claims: "AJRATILGAN DA’VOLAR", sources: "TAVILY MANBALARI", queries: "Qidiruv so‘rovlari", important: "MUHIM", warning: "RuFact ehtimoliy baho beradi, yakuniy faktik hukm emas. Asosiy da’volarni mustaqil birlamchi manbalarda tekshiring.", checked: "Tavily internet qidiruvini bajardi, Gemini esa matnni natijalar bilan solishtirdi; xulosa sifati topilgan manbalar va ularning kontekstiga bog‘liq.", unchecked: "Tashqi manbalar avtomatik tekshirilmadi." }
     : locale === "en"

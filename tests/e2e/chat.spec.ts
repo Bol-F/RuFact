@@ -15,6 +15,10 @@ test("localized chat works on phone and desktop with follow-ups and clearing", a
   await page.goto("/chat");
   await expect(page).toHaveTitle(/AI chat/);
   await expect(page.getByRole("heading", { name: "Birgalikda aniqlaymiz." })).toBeVisible();
+  // A visible SSR heading is not hydration proof. Screenshot caret hiding can
+  // otherwise mutate the still-unhydrated feedback textarea and cause a false warning.
+  await changeLanguage(page, "en");
+  await changeLanguage(page, "uz");
   await page.screenshot({ path: join(tmpdir(), `rufact-chat-empty-${testInfo.project.name}.png`) });
   await page.getByRole("button", { name: "O‘zbekiston poytaxti Toshkentmi?" }).click();
   const input = page.getByRole("textbox", { name: "AI chat uchun savol" });
