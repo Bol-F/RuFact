@@ -6,6 +6,8 @@
   лимиты, обработка повторов и проверка доставки.
 - [`SECURITY.md`](SECURITY.md) — модель угроз, JWT, rate limiting, web-защита,
   dependency audit и разбор N+1.
+- [`PERFORMANCE.md`](PERFORMANCE.md) — измерения ML/Redis, асинхронное переключение
+  изображений, кэширование публичных ресурсов и ограничения размеров потоков.
 - [`CLAIM_ANALYSIS_CONTRACT.md`](CLAIM_ANALYSIS_CONTRACT.md) — строгий контракт
   проверки источников через Tavily + Gemini.
 - [`ROADMAP_10_DAYS.md`](ROADMAP_10_DAYS.md) — выполненный десятидневный MVP-план.

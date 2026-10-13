@@ -18,10 +18,12 @@ import { createAbortScope } from "@/lib/server/abort-scope";
 import { isAppLocale, type AppLocale } from "@/lib/i18n";
 import type { TextLanguage } from "@/lib/text-language";
 import { resolveAnalysis } from "@/lib/server/analysis-routing";
+import { BodyTooLargeError, readBoundedText } from "@/lib/server/bounded-text";
 
 const MAX_TEXT_LENGTH = 5_000;
 const MAX_BODY_BYTES = 24_000;
 const ML_TIMEOUT_MS = 8_000;
+const MAX_ML_RESPONSE_BYTES = 128_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" } as const;
 
 export const maxDuration = 30;
@@ -136,7 +138,10 @@ async function requestMlPrediction(
       };
     }
 
-    const payload: unknown = await response.json();
+    const payload: unknown = JSON.parse(await readBoundedText(response, {
+      maxBytes: MAX_ML_RESPONSE_BYTES,
+      signal: abortScope.signal,
+    }));
     if (!isAnalysisPayload(payload)) {
       return {
         ok: false,
@@ -212,19 +217,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return jsonResponse({ error: "Тело запроса слишком большое." }, 413);
-  }
-
   let body: unknown;
   try {
-    const rawBody = await request.text();
-    if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+    const rawBody = await readBoundedText(request, {
+      maxBytes: MAX_BODY_BYTES,
+      signal: request.signal,
+    });
+    body = JSON.parse(rawBody);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
       return jsonResponse({ error: "Тело запроса слишком большое." }, 413);
     }
-    body = JSON.parse(rawBody);
-  } catch {
     return jsonResponse(
       { error: "Тело запроса должно содержать JSON." },
       400,

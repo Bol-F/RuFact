@@ -13,6 +13,14 @@ Both photographs were adapted using the built-in image-generation tool: paper ba
 
 The existing Russian `public/hero-collage.png` is unchanged by this redesign.
 
+Runtime uses content-addressed, alpha-preserving WebP derivatives in `public/artwork/`.
+Each locale has a 960px and full-size variant; the browser chooses through `srcset`.
+These derivatives preserve the existing composition and licences. Hash URLs allow
+immutable browser/CDN caching without stale images after an update. The last decoded
+picture stays visible until the selected replacement is decoded; late completions
+cannot repaint another language. Phones skip both downloads and JS preloading.
+Regeneration and size measurements are documented in [PERFORMANCE.md](PERFORMANCE.md).
+
 ## Generation brief
 
 The two final asset prompts used the following shared brief, substituting the location and original photograph:

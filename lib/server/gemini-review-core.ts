@@ -9,6 +9,7 @@ import type {
 } from "../gemini-review";
 import type { TavilyEvidence } from "./tavily-search";
 import { createAbortScope } from "./abort-scope.ts";
+import { readBoundedText } from "./bounded-text.ts";
 import type { AppLocale } from "../i18n";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
@@ -409,28 +410,15 @@ export async function requestGeminiAssessment({
       return unavailable("upstream-error");
     }
 
-    const declaredResponseLength = Number(
-      response.headers.get("content-length"),
-    );
-    if (
-      Number.isFinite(declaredResponseLength) &&
-      declaredResponseLength > MAX_PROVIDER_RESPONSE_BYTES
-    ) {
-      return unavailable("invalid-response");
-    }
-
     let payload: unknown;
     try {
-      const rawPayload = await response.text();
-      if (
-        new TextEncoder().encode(rawPayload).byteLength >
-        MAX_PROVIDER_RESPONSE_BYTES
-      ) {
-        return unavailable("invalid-response");
-      }
+      const rawPayload = await readBoundedText(response, {
+        maxBytes: MAX_PROVIDER_RESPONSE_BYTES,
+        signal: abortScope.signal,
+      });
       payload = JSON.parse(rawPayload);
     } catch {
-      return unavailable("invalid-response");
+      return unavailable(abortScope.signal.aborted ? "timeout" : "invalid-response");
     }
 
     if (wasBlocked(payload)) {

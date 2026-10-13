@@ -1,5 +1,6 @@
 import type { GeminiSource } from "../gemini-review";
 import { createAbortScope } from "./abort-scope.ts";
+import { readBoundedText } from "./bounded-text.ts";
 import type { AppLocale } from "../i18n";
 
 const TAVILY_SEARCH_ENDPOINT = "https://api.tavily.com/search";
@@ -143,15 +144,10 @@ export async function requestTavilyEvidence({
     }
     if (!response.ok) return { ok: false, reason: "search-error" };
 
-    const declaredLength = Number(response.headers.get("content-length"));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-      return { ok: false, reason: "search-error" };
-    }
-
-    const rawPayload = await response.text();
-    if (new TextEncoder().encode(rawPayload).byteLength > MAX_RESPONSE_BYTES) {
-      return { ok: false, reason: "search-error" };
-    }
+    const rawPayload = await readBoundedText(response, {
+      maxBytes: MAX_RESPONSE_BYTES,
+      signal: abortScope.signal,
+    });
 
     let payload: unknown;
     try {
