@@ -7,7 +7,10 @@ import {
 } from "lucide-react";
 
 import type { AnalysisLabel } from "@/lib/api";
+import { claimExplanationCopy } from "@/lib/claim-copy";
+import { safeSourceHref } from "@/lib/claim-evidence";
 import type { GeminiReview } from "@/lib/gemini-review";
+import { ClaimExplanation } from "./ClaimExplanation";
 import { GeminiClaimsPanel } from "./GeminiClaimsPanel";
 import { useLanguage } from "./LanguageProvider";
 
@@ -88,6 +91,10 @@ export function GeminiReviewPanel({
   }
 
   const isUnsure = review.label === "UNSURE";
+  const contradictedClaim = review.claims.find(
+    (claim) => claim.kind === "FACTUAL" && claim.assessment === "CONTRADICTED",
+  );
+  const safeSources = review.sources.filter((source) => safeSourceHref(source));
   const disagrees = review.agreesWithPrimary === false;
   const heading = isUnsure
     ? labels.unsure
@@ -103,7 +110,7 @@ export function GeminiReviewPanel({
   return (
     <section
       aria-label={labels.aria}
-      className={`mt-4 rounded-[13px] border px-4 py-3.5 ${toneClass}`}
+      className={`mt-4 rounded-[13px] border px-3 py-3 sm:px-4 sm:py-3.5 ${toneClass}`}
     >
       <div className="flex items-start gap-3">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white/70 text-[#31648e]">
@@ -127,6 +134,32 @@ export function GeminiReviewPanel({
               Tavily + Gemini
             </span>
           </div>
+
+          {review.coverage === "partial" ? (
+            <p
+              className="mt-3 rounded-lg border border-[#ead8ba] bg-[#fff8eb] px-3 py-2 text-xs leading-relaxed text-[#76552b]"
+              data-testid="claim-partial-coverage"
+            >
+              {claimExplanationCopy[locale].partialCoverage}
+            </p>
+          ) : null}
+
+          {contradictedClaim ? (
+            <section
+              aria-label={claimExplanationCopy[locale].highlight}
+              className="mt-3 min-w-0 rounded-[11px] border border-[#edcdc8] bg-[#fff8f6] p-3"
+              data-testid="claim-correction-highlight"
+            >
+              <h4 className="text-sm leading-relaxed font-extrabold text-[#9d3940]">
+                {claimExplanationCopy[locale].highlight}
+              </h4>
+              <ClaimExplanation
+                claim={contradictedClaim}
+                sources={review.sources}
+                locale={locale}
+              />
+            </section>
+          ) : null}
 
           {hasStatisticalResult ? <div className="mt-3 grid grid-cols-2 gap-2 text-[0.625rem]">
             <div className="rounded-[9px] bg-white/60 px-3 py-2">
@@ -161,7 +194,11 @@ export function GeminiReviewPanel({
             </ul>
           ) : null}
 
-          <GeminiClaimsPanel claims={review.claims} />
+          <GeminiClaimsPanel
+            claims={review.claims}
+            sources={review.sources}
+            highlightedClaimId={contradictedClaim?.id}
+          />
 
           <details open className="group mt-3 overflow-hidden rounded-[11px] border border-[#cbd8e2]/90 bg-white/55">
             <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-[10px] px-3 text-[#294a65] marker:hidden">
@@ -172,14 +209,14 @@ export function GeminiReviewPanel({
                 {labels.sources}
               </span>
               <span className="rounded-md bg-white/80 px-2 py-0.5 text-[0.5625rem] font-bold tabular-nums text-[#60768a]">
-                {review.sources.length}
+                {safeSources.length}
               </span>
             </summary>
             <ul
               aria-label={labels.sourcesAria}
               className="grid gap-2 border-t border-[#cbd8e2]/80 px-3 py-3"
             >
-              {review.sources.map((source, index) => (
+              {safeSources.map((source, index) => (
                 <li key={source.id}>
                   <a
                     href={source.url}
@@ -190,7 +227,7 @@ export function GeminiReviewPanel({
                     <span className="mt-0.5 text-[0.5625rem] tabular-nums text-[#8293a1]">
                       {index + 1}.
                     </span>
-                    <span className="min-w-0 flex-1">{source.title}</span>
+                    <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{source.title}</span>
                     <ExternalLink className="mt-0.5 shrink-0" size={12} aria-hidden="true" />
                   </a>
                 </li>

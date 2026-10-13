@@ -2,6 +2,8 @@ import type { AnalysisResponse } from "@/lib/api";
 import type { AppLocale } from "@/lib/i18n";
 import { getPublicVerdict } from "./api.ts";
 import { verdictCopy } from "./verdict-copy.ts";
+import { claimCopy } from "./claim-copy.ts";
+import { deriveClaimLabel, resolveClaimEvidence, safeSourceHref } from "./claim-evidence.ts";
 
 interface AnalysisReportInput {
   result: AnalysisResponse;
@@ -62,25 +64,48 @@ export function buildAnalysisReport({
 
   if (result.geminiReview?.status === "complete") {
     const review = result.geminiReview;
+    const detailCopy = claimCopy[locale];
     lines.push(
       "",
       copy.review,
-      `${copy.result}: ${review.label}`,
+      `${copy.result}: ${review.promptVersion === "misinfo-tavily-v4" ? deriveClaimLabel(review.claims, review.coverage) : review.label}`,
       review.explanation,
+      ...(review.coverage === "partial" ? [detailCopy.partialCoverage] : []),
       "",
       copy.claims,
     );
 
-    for (const [index, claim] of review.claims.entries()) {
+    const claims = [...review.claims].sort((left, right) => {
+      const rank = (claim: typeof left) => claim.kind === "FACTUAL" && claim.assessment === "CONTRADICTED" ? 0
+        : claim.assessment === "MIXED" ? 1 : claim.assessment === "UNVERIFIED" ? 2 : 3;
+      return rank(left) - rank(right);
+    });
+    for (const [index, claim] of claims.entries()) {
       lines.push(
-        `${index + 1}. [${claim.kind} / ${claim.assessment}] «${claim.quote}»`,
-        `   ${claim.explanation}`,
+        `${index + 1}. [${claim.kind} / ${claim.assessment}]`,
+        `   ${detailCopy.claim}: «${claim.quote}»`,
+        `   ${detailCopy.why}: ${claim.explanation}`,
       );
+      const evidence = resolveClaimEvidence(claim.evidence, review.sources);
+      const correctionEvidence = claim.kind === "FACTUAL" && claim.assessment === "CONTRADICTED"
+        ? resolveClaimEvidence(claim.correction?.evidence, review.sources) : [];
+      for (const item of evidence) {
+        lines.push(`   ${detailCopy.evidence}: «${item.quote}»`,
+          `   ${detailCopy.source}: ${item.source.title}`, `   ${item.source.url}`);
+      }
+      if (claim.correction?.text && correctionEvidence.length) {
+        lines.push(`   ${detailCopy.correction}: ${claim.correction.text}`);
+        for (const item of correctionEvidence) {
+          lines.push(`   ${detailCopy.correctionEvidence}: «${item.quote}»`,
+            `   ${detailCopy.source}: ${item.source.title}`, `   ${item.source.url}`);
+        }
+      }
     }
 
     lines.push("", copy.sources);
     for (const [index, source] of review.sources.entries()) {
-      lines.push(`${index + 1}. ${source.title}`, `   ${source.url}`);
+      const href = safeSourceHref(source);
+      if (href) lines.push(`${index + 1}. ${source.title}`, `   ${href}`);
     }
     lines.push("", `${copy.queries}: ${review.searchQueries.join(" · ")}`);
   }

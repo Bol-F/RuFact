@@ -31,6 +31,11 @@ test("sends a server-authenticated Tavily request and validates sources", async 
             url: "javascript:alert(1)",
             content: "Этот результат должен быть отброшен.",
           },
+          {
+            title: "URL с учётными данными",
+            url: "https://user:password@example.org/private",
+            content: "Этот результат также должен быть отброшен.",
+          },
         ],
       });
     },

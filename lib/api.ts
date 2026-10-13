@@ -10,6 +10,7 @@ import type {
   GeminiUnavailableReason,
 } from "@/lib/gemini-review";
 import type { TextLanguage } from "./text-language";
+import { deriveClaimLabel, MAX_CORRECTION_LENGTH, readClaimEvidence, safeSourceHref } from "./claim-evidence.ts";
 
 export type { GeminiReview } from "@/lib/gemini-review";
 
@@ -73,7 +74,8 @@ export function getPublicVerdict(result: AnalysisResponse) {
   if (result.geminiReview?.status === "complete") {
     return {
       basis: "sources" as const,
-      label: result.geminiReview.label,
+      label: result.geminiReview.promptVersion === "misinfo-tavily-v4"
+        ? deriveClaimLabel(result.geminiReview.claims, result.geminiReview.coverage) : result.geminiReview.label,
       confidence: null,
       certainty: result.geminiReview.certainty,
       explanation: result.geminiReview.explanation,
@@ -357,6 +359,7 @@ function sanitizeGeminiReview(
   }
 
   const completeKeys = Object.keys(review);
+  const modern = review.promptVersion === "misinfo-tavily-v4";
   const expectedCompleteKeys = [
     "status",
     "provider",
@@ -371,6 +374,7 @@ function sanitizeGeminiReview(
     "externalSourcesChecked",
     "searchQueries",
     "sources",
+    ...(modern ? ["coverage"] : []),
   ];
 
   if (
@@ -380,7 +384,8 @@ function sanitizeGeminiReview(
     typeof review.model !== "string" ||
     review.model.length === 0 ||
     review.model.length > 100 ||
-    review.promptVersion !== "misinfo-tavily-v3" ||
+    (!modern && review.promptVersion !== "misinfo-tavily-v3") ||
+    (modern && review.coverage !== "complete" && review.coverage !== "partial") ||
     !isGeminiLabel(review.label) ||
     !isGeminiCertainty(review.certainty) ||
     typeof review.explanation !== "string" ||
@@ -434,7 +439,7 @@ function sanitizeGeminiReview(
     const claim = claimValue as Record<string, unknown>;
     const claimKeys = Object.keys(claim);
     if (
-      claimKeys.length !== 6 ||
+      claimKeys.length !== (modern ? 8 : 6) ||
       !claimKeys.every((key) =>
         [
           "id",
@@ -443,6 +448,7 @@ function sanitizeGeminiReview(
           "assessment",
           "explanation",
           "needsExternalVerification",
+          ...(modern ? ["evidence", "correction"] : []),
         ].includes(key),
       ) ||
       claim.id !== `claim-${index + 1}` ||
@@ -491,7 +497,7 @@ function sanitizeGeminiReview(
   for (const query of review.searchQueries) {
     if (typeof query !== "string") return null;
     const normalized = query.trim();
-    if (!normalized || normalized.length > 300 || searchQueries.includes(normalized)) {
+    if (!normalized || normalized.length > 700 || searchQueries.includes(normalized)) {
       return null;
     }
     searchQueries.push(normalized);
@@ -517,20 +523,42 @@ function sanitizeGeminiReview(
     if (!title || title.length > 240 || url.length > 2_048 || sourceUrls.has(url)) {
       return null;
     }
-    try {
-      if (new URL(url).protocol !== "https:") return null;
-    } catch {
-      return null;
-    }
+    if (!safeSourceHref({ id: source.id, title, url })) return null;
     sourceUrls.add(url);
     sources.push({ id: source.id, title, url });
+  }
+
+  if (modern) {
+    for (const [index, claimValue] of review.claims.entries()) {
+      const raw = claimValue as Record<string, unknown>;
+      const claim = claims[index];
+      const passages = readClaimEvidence(raw.evidence, sources);
+      if (!passages || ((claim.assessment === "SUPPORTED" || claim.assessment === "CONTRADICTED") && !passages.length) ||
+        (claim.kind === "OPINION" && passages.length)) return null;
+      claim.evidence = passages;
+      claim.correction = null;
+      if (raw.correction !== null) {
+        if (!raw.correction || typeof raw.correction !== "object" || Array.isArray(raw.correction)) return null;
+        const correction = raw.correction as Record<string, unknown>;
+        if (Object.keys(correction).length !== 2 || !Object.keys(correction).every(key => key === "text" || key === "evidence") ||
+          claim.kind !== "FACTUAL" || claim.assessment !== "CONTRADICTED" || typeof correction.text !== "string") return null;
+        const text = correction.text.trim();
+        const passages = readClaimEvidence(correction.evidence, sources);
+        if (text.length < 4 || text.length > MAX_CORRECTION_LENGTH || text === claim.quote || !passages?.length) return null;
+        claim.correction = { text, evidence: passages };
+      }
+    }
+    const original = analyzedText.trim();
+    if (original.length <= 320 && !/[.!?。！？]\s+\S/u.test(original) &&
+      (claims.length !== 1 || claims[0].quote !== original)) return null;
+    if (deriveClaimLabel(claims, review.coverage as "complete" | "partial") !== review.label) return null;
   }
 
   return {
     status: "complete",
     provider: "gemini",
     model: review.model,
-    promptVersion: "misinfo-tavily-v3",
+    promptVersion: modern ? "misinfo-tavily-v4" : "misinfo-tavily-v3",
     label: review.label,
     certainty: review.certainty,
     agreesWithPrimary: expectedAgreement,
@@ -540,6 +568,7 @@ function sanitizeGeminiReview(
     externalSourcesChecked: true,
     searchQueries,
     sources,
+    ...(modern ? { coverage: review.coverage as "complete" | "partial" } : {}),
   };
 }
 

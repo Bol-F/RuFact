@@ -132,6 +132,84 @@ test("failed checks are never presented as true and unsafe links are omitted", (
   assert.match(result, /&lt;b&gt;Claim&lt;\/b&gt;/);
 });
 
+function contradictedClaim(overrides = {}) {
+  return {
+    id: "capital-claim", quote: "Samarkand is the capital of Uzbekistan.",
+    kind: "FACTUAL", assessment: "CONTRADICTED", needsExternalVerification: false,
+    explanation: "The cited source identifies Tashkent, not Samarkand, as Uzbekistan’s capital.",
+    evidence: [{ sourceId: "s1", quote: "The capital of the Republic of Uzbekistan is the city of Tashkent." }],
+    correction: {
+      text: "Tashkent is the capital of Uzbekistan.",
+      evidence: [{ sourceId: "s1", quote: "The capital of the Republic of Uzbekistan is the city of Tashkent." }],
+    },
+    ...overrides,
+  };
+}
+
+test("Telegram shows the original false claim, why and the evidenced correction first", () => {
+  const supported = { ...contradictedClaim(), id: "supported", quote: "A separate supported claim.", assessment: "SUPPORTED", correction: null };
+  const result = formatTelegramAssessment({ ...assessment, label: "FAKE", promptVersion: "misinfo-tavily-v4", coverage: "complete", claims: [supported, contradictedClaim()] }, "en");
+  assert.match(result, /Samarkand is the capital of Uzbekistan\./u);
+  assert.match(result, /Why[^\n]*Tashkent, not Samarkand/u);
+  assert.match(result, /Correct fact[^\n]*Tashkent is the capital of Uzbekistan\./u);
+  assert.match(result, /<a href="https:\/\/example.org\/source">/u);
+  assert.match(result, /The capital of the Republic of Uzbekistan is the city of Tashkent\./u);
+  assert.ok(result.indexOf("Samarkand is the capital") < result.indexOf("A separate supported claim"));
+  assert.ok(result.length <= 4000);
+});
+
+test("Telegram localizes reasons and corrections in Russian and Uzbek without losing the claim", () => {
+  for (const [locale, why, correction] of [["ru", "Почему", "Верный факт"], ["uz", "Nega", "To‘g‘ri fakt"]]) {
+    const result = formatTelegramAssessment({ ...assessment, label: "FAKE", claims: [contradictedClaim()] }, locale);
+    assert.ok(result.includes(why));
+    assert.ok(result.includes(correction));
+    assert.ok(result.includes(contradictedClaim().quote));
+  }
+});
+
+test("Telegram never invents a correction for legacy or unverified claims", () => {
+  const legacy = contradictedClaim({ evidence: undefined, correction: undefined });
+  const result = formatTelegramAssessment({ ...assessment, label: "FAKE", claims: [legacy] }, "en");
+  assert.ok(result.includes(legacy.explanation));
+  assert.doesNotMatch(result, /Correct fact/u);
+  const unverified = formatTelegramAssessment({ ...assessment, label: "UNSURE", claims: [contradictedClaim({ assessment: "UNVERIFIED" })] }, "en");
+  assert.doesNotMatch(unverified, /Correct fact/u);
+});
+
+test("Telegram suppresses corrections without safe matching evidence and escapes complete facts", () => {
+  for (const evidence of [[], [{ sourceId: "missing", quote: "An unsupported correction." }], [{ sourceId: "unsafe", quote: "Bad link." }]]) {
+    const result = formatTelegramAssessment({ ...assessment, label: "FAKE", sources: [...assessment.sources, { id: "unsafe", title: "Bad", url: "javascript:alert(1)" }], claims: [contradictedClaim({ correction: { text: "Do not display this correction.", evidence } })] }, "en");
+    assert.doesNotMatch(result, /Do not display this correction/u);
+    assert.doesNotMatch(result, /javascript:/u);
+  }
+  const claim = contradictedClaim({ quote: "<b>Samarkand</b> is not Tashkent.", explanation: "<script>Untrusted</script> explanation." });
+  const result = formatTelegramAssessment({ ...assessment, label: "FAKE", claims: [claim] }, "en");
+  assert.match(result, /&lt;b&gt;Samarkand&lt;\/b&gt; is not Tashkent\./u);
+  assert.match(result, /&lt;script&gt;Untrusted&lt;\/script&gt; explanation\./u);
+  assert.doesNotMatch(result, /<script>/u);
+});
+
+test("Telegram packs complete claim blocks rather than truncating negation or reasons", () => {
+  const quote = `${"A contextual qualification. ".repeat(8)}Samarkand is not the capital.`;
+  const explanation = `${"A detailed reason based on the source. ".repeat(6)}The capital is Tashkent, not Samarkand.`;
+  const claim = contradictedClaim({ quote, explanation });
+  const result = formatTelegramAssessment({ ...assessment, label: "FAKE", claims: Array.from({ length: 6 }, (_, index) => ({ ...claim, id: `claim-${index}` })) }, "en");
+  assert.ok(result.includes(quote));
+  assert.ok(result.includes(explanation));
+  assert.ok(result.includes("not the capital."));
+  assert.ok(result.includes("More claim details"));
+  assert.ok(result.length <= 4000);
+  assert.doesNotMatch(result, /…/u);
+});
+
+test("Telegram does not present a partial source check as all supported", () => {
+  const supported = contradictedClaim({ assessment: "SUPPORTED", correction: null });
+  const result = formatTelegramAssessment({ ...assessment, promptVersion: "misinfo-tavily-v4", coverage: "partial", claims: [supported] }, "en");
+  assert.match(result, /Insufficient \/ mixed evidence/u);
+  assert.match(result, /Only some claims were checked/u);
+  assert.doesNotMatch(result, /🟢/u);
+});
+
 test("localized navigation buttons select language and mode without searching", async () => {
   const { deps, assessed, sent } = harness();
   for (const [index, text] of ["🌐 Til / Language", "🇬🇧 English", "🔎 Check text"].entries()) {

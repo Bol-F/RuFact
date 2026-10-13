@@ -8,11 +8,15 @@ import {
 import type {
   GeminiClaim,
   GeminiClaimAssessment,
+  GeminiSource,
 } from "@/lib/gemini-review";
+import { ClaimExplanation } from "./ClaimExplanation";
 import { useLanguage } from "./LanguageProvider";
 
 interface GeminiClaimsPanelProps {
   claims: readonly GeminiClaim[];
+  sources: readonly GeminiSource[];
+  highlightedClaimId?: string;
 }
 
 const assessmentCopy: Record<GeminiClaimAssessment, string> = {
@@ -48,7 +52,7 @@ function factualClaimSummary(count: number) {
   return `${count} фактологических утверждений сопоставлены с результатами поиска.`;
 }
 
-export function GeminiClaimsPanel({ claims }: GeminiClaimsPanelProps) {
+export function GeminiClaimsPanel({ claims, sources, highlightedClaimId }: GeminiClaimsPanelProps) {
   const { locale } = useLanguage();
   const labels = locale === "uz"
     ? { title: "Matndagi da’volar", show: "Ko‘rsatish", hide: "Yashirish", opinionOnly: "Matnda faqat subyektiv fikrlar ajratildi.", aria: "Gemini ajratgan da’volar", fact: "Fakt", opinion: "Fikr", verify: "Qo‘shimcha tekshirish", source: "birlamchi manba", assessments: { SUPPORTED: "Tasdiqlanadi", CONTRADICTED: "Rad etiladi", MIXED: "Manbalar farq qiladi", UNVERIFIED: "Tekshirilmadi", NOT_APPLICABLE: "Subyektiv fikr" } }
@@ -113,12 +117,13 @@ export function GeminiClaimsPanel({ claims }: GeminiClaimsPanelProps) {
                 </span>
               </div>
 
-              <blockquote className="mt-2 border-l-2 border-[#7897ad] pl-2.5 text-[0.65625rem] leading-[1.5] font-semibold text-[#354f65]">
-                «{claim.quote}»
-              </blockquote>
-              <p className="mt-2 text-[0.625rem] leading-[1.5] text-[#6b7b89]">
-                {claim.explanation}
-              </p>
+              {claim.id === highlightedClaimId ? (
+                <blockquote className="mt-2 border-l-2 border-[#7897ad] pl-2.5 text-sm leading-relaxed font-semibold whitespace-pre-wrap text-[#354f65] [overflow-wrap:anywhere]">
+                  {claim.quote}
+                </blockquote>
+              ) : (
+                <ClaimExplanation claim={claim} sources={sources} locale={locale} />
+              )}
 
               {claim.needsExternalVerification ? (
                 <a

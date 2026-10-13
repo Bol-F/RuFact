@@ -58,8 +58,10 @@ async function fakeProviders(mode: ProviderMode = "complete") {
             : "Topilgan manba ushbu tekshirilgan da’voni tasdiqlaydi.";
         response.end(JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{
           text: JSON.stringify(mode === "invalid-gemini" ? { label: "REAL" } : {
-            label: "REAL", certainty: "high", explanation, warningSigns: [],
-            claims: [{ quote: userText, kind: "FACTUAL", assessment: "SUPPORTED", explanation }],
+            label: "REAL", certainty: "high", explanation, warningSigns: [], coverage: "complete",
+            claims: [{ quote: userText, kind: "FACTUAL", assessment: "SUPPORTED", explanation,
+              evidence: [{ sourceId: "source-1", quote: "The supplied source supports the quoted claim for this routing test." }],
+              correction: null }],
           }),
         }] } }] }));
       } else {
@@ -299,7 +301,7 @@ test("Uzbek source-only replies render usable links, no ML score, and no runtime
       await expect(page.locator('.analysis-result [role="meter"]')).toHaveCount(0);
       await expect(page.locator("[data-statistical-summary]")).toHaveCount(0);
       await expect(page.locator("[data-statistical-placeholder]")).toHaveCount(0);
-      const source = page.locator('.analysis-result a[href="https://example.org/uzbek-routing-source"]');
+      const source = page.locator('.analysis-result details[open] a[href="https://example.org/uzbek-routing-source"]');
       await expect(source).toBeVisible();
       await expect(source).toHaveAttribute("target", "_blank");
     }

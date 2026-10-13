@@ -2,6 +2,7 @@ import type { GeminiSource } from "../gemini-review";
 import { createAbortScope } from "./abort-scope.ts";
 import { readBoundedText } from "./bounded-text.ts";
 import type { AppLocale } from "../i18n";
+import { safeSourceHref } from "../claim-evidence.ts";
 
 const TAVILY_SEARCH_ENDPOINT = "https://api.tavily.com/search";
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -84,11 +85,7 @@ function parseEvidence(value: unknown): TavilyEvidence | null {
     ) {
       continue;
     }
-    try {
-      if (new URL(url).protocol !== "https:") continue;
-    } catch {
-      continue;
-    }
+    if (!safeSourceHref({ id: "candidate", title, url })) continue;
 
     seenUrls.add(url);
     sources.push({

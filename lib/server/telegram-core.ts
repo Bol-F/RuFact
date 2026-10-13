@@ -4,6 +4,9 @@ import type { GeminiAssessment } from "./gemini-review-core";
 import { escapeTelegramHtml, telegramButtonCommand, telegramNotice, telegramUi } from "./telegram-ui.ts";
 import { parseChatMessages, recentChatMessages, safeChatSources, type ChatMessage, type ChatReply } from "../chat.ts";
 import { localChatReply } from "../chat-local.ts";
+import { claimCopy } from "../claim-copy.ts";
+import { deriveClaimLabel, resolveClaimEvidence, safeSourceHref } from "../claim-evidence.ts";
+import type { GeminiClaim } from "../gemini-review";
 
 export interface TelegramMessage {
   updateId: number;
@@ -89,21 +92,55 @@ function shorten(text: string, length: number) {
 export function formatTelegramAssessment(result: GeminiAssessment, locale: AppLocale) {
   const copy = botCopy[locale];
   if (result.status !== "complete") return copy.unavailable;
-  const claims = result.claims.slice(0, 3).map(claim => `• <b>${escapeTelegramHtml(shorten(claim.quote, 90))}</b>\n${escapeTelegramHtml(shorten(claim.explanation, 130))}`);
+  const detailCopy = claimCopy[locale];
+  const rank = (claim: GeminiClaim) => claim.kind === "FACTUAL" && claim.assessment === "CONTRADICTED" ? 0
+    : claim.assessment === "MIXED" ? 1 : claim.assessment === "UNVERIFIED" ? 2 : 3;
+  const claims = [...result.claims].sort((left, right) => rank(left) - rank(right));
   const sources = result.sources.slice(0, 4).flatMap(source => {
-    try {
-      const url = new URL(source.url);
-      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.href.length > 450) return [];
-      return [`• <a href="${escapeTelegramHtml(url.href)}">${escapeTelegramHtml(shorten(source.title.replace(/[\r\n]/g, " "), 65))}</a>`];
-    } catch { return []; }
+    const href = safeSourceHref(source);
+    return href ? [`• <a href="${escapeTelegramHtml(href)}">${escapeTelegramHtml(shorten(source.title.replace(/[\r\n]/g, " "), 65))}</a>`] : [];
   });
-  const icon = result.label === "REAL" ? "🟢" : result.label === "FAKE" ? "🔴" : "🟡";
-  // Escape untrusted content before using Telegram HTML. Never truncate markup.
-  const sections = [`<b>🔎 ${escapeTelegramHtml(copy.title)}</b>`, `<b>${icon} ${escapeTelegramHtml(copy.labels[result.label])}</b>`, escapeTelegramHtml(shorten(result.explanation, 500))];
-  for (const section of [claims.length ? `<b>📌 ${copy.claims}</b>\n${claims.join("\n\n")}` : "", sources.length ? `<b>🔗 ${copy.sources}</b>\n${sources.join("\n")}` : ""]) {
-    if (section && [...sections, section, copy.disclaimer].join("\n\n").length < 4000) sections.push(section);
+  const label = result.promptVersion === "misinfo-tavily-v4" ? deriveClaimLabel(result.claims, result.coverage) : result.label;
+  const icon = label === "REAL" ? "🟢" : label === "FAKE" ? "🔴" : "🟡";
+  const sections = [`<b>🔎 ${escapeTelegramHtml(copy.title)}</b>`, `<b>${icon} ${escapeTelegramHtml(copy.labels[label])}</b>`];
+  if (result.coverage === "partial") sections.push(escapeTelegramHtml(detailCopy.partialCoverage));
+  const footer = `<i>${escapeTelegramHtml(copy.disclaimer)}</i>`;
+  const omitted = `<i>${escapeTelegramHtml(detailCopy.claimsOmitted)}</i>`;
+  const claimHeading = `<b>📌 ${escapeTelegramHtml(copy.claims)}</b>`;
+  const blocks: string[] = [];
+  // Pack complete blocks after escaping. Cutting a claim or a reason can remove
+  // negation, qualifications or the very fact that makes the statement false.
+  for (const claim of claims) {
+    const evidence = resolveClaimEvidence(claim.evidence, result.sources);
+    const correctionEvidence = claim.kind === "FACTUAL" && claim.assessment === "CONTRADICTED"
+      ? resolveClaimEvidence(claim.correction?.evidence, result.sources) : [];
+    const block = [
+      `• <b>${escapeTelegramHtml(detailCopy.claim)}:</b> «${escapeTelegramHtml(claim.quote)}»`,
+      `<b>${escapeTelegramHtml(detailCopy.why)}:</b> ${escapeTelegramHtml(claim.explanation)}`,
+    ];
+    if (claim.correction?.text && correctionEvidence.length) {
+      block.push(`<b>${escapeTelegramHtml(detailCopy.correction)}:</b> ${escapeTelegramHtml(claim.correction.text)}`);
+    }
+    const passages = [evidence[0], correctionEvidence[0]].filter((item, index, items) => item && items.findIndex(previous => previous?.sourceId === item.sourceId && previous?.quote === item.quote) === index);
+    for (const item of passages) {
+      if (!item) continue;
+      block.push(`<b>${escapeTelegramHtml(detailCopy.evidence)}:</b> «${escapeTelegramHtml(item.quote)}»`,
+        `<a href="${escapeTelegramHtml(item.source.url)}">${escapeTelegramHtml(shorten(item.source.title.replace(/[\r\n]/g, " "), 65))}</a>`);
+    }
+    const completeBlock = block.join("\n");
+    if ([...sections, claimHeading, ...blocks, completeBlock, omitted, footer].join("\n\n").length <= 4000) blocks.push(completeBlock);
   }
-  return [...sections, `<i>${escapeTelegramHtml(copy.disclaimer)}</i>`].join("\n\n");
+  if (blocks.length) sections.push(`${claimHeading}\n${blocks.join("\n\n")}`);
+  if (blocks.length < claims.length) sections.push(omitted);
+  const explanation = escapeTelegramHtml(result.explanation);
+  if (explanation && [...sections, explanation, footer].join("\n\n").length <= 4000) sections.push(explanation);
+  const links: string[] = [];
+  const sourceHeading = `<b>🔗 ${escapeTelegramHtml(copy.sources)}</b>`;
+  for (const source of sources) {
+    if ([...sections, `${sourceHeading}\n${[...links, source].join("\n")}`, footer].join("\n\n").length <= 4000) links.push(source);
+  }
+  if (links.length) sections.push(`${sourceHeading}\n${links.join("\n")}`);
+  return [...sections, footer].join("\n\n");
 }
 
 export interface TelegramStore {

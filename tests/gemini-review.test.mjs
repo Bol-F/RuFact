@@ -36,6 +36,7 @@ function successfulEnvelope(overrides = {}) {
                 explanation:
                   "В тексте недостаточно проверяемых данных для уверенного вывода.",
                 warningSigns: ["Нет конкретного первоисточника"],
+                coverage: "complete",
                 claims: [
                   {
                     quote: TEST_QUOTE,
@@ -43,6 +44,7 @@ function successfulEnvelope(overrides = {}) {
                     assessment: "UNVERIFIED",
                     explanation:
                       "Категоричное утверждение не содержит проверяемого источника.",
+                    evidence: [], correction: null,
                   },
                 ],
                 ...overrides,
@@ -76,7 +78,7 @@ test("sends a server-authenticated structured request and parses a valid review"
   assert.equal(result.status, "complete");
   assert.equal(result.label, "UNSURE");
   assert.equal(result.externalSourcesChecked, true);
-  assert.equal(result.promptVersion, "misinfo-tavily-v3");
+  assert.equal(result.promptVersion, "misinfo-tavily-v4");
   assert.deepEqual(result.searchQueries, ["Учёные всё доказали источник"]);
   assert.deepEqual(result.sources, [
     {
@@ -94,6 +96,7 @@ test("sends a server-authenticated structured request and parses a valid review"
       explanation:
         "Категоричное утверждение не содержит проверяемого источника.",
       needsExternalVerification: true,
+      evidence: [], correction: null,
     },
   ]);
 
@@ -109,16 +112,19 @@ test("sends a server-authenticated structured request and parses a valid review"
   assert.equal(bodyText.includes(TEST_KEY), false);
   assert.equal(body.tools, undefined);
   assert.equal(
-    body.generationConfig.responseMimeType,
-    "application/json",
+    body.generationConfig.responseFormat.text.mimeType,
+    "APPLICATION_JSON",
   );
-  assert.equal(body.generationConfig.responseSchema.type, "object");
+  assert.equal(body.generationConfig.responseFormat.text.schema.type, "object");
+  assert.equal(body.generationConfig.responseSchema, undefined);
+  assert.equal(body.generationConfig.responseMimeType, undefined);
+  assert.deepEqual(body.generationConfig.responseFormat.text.schema.properties.claims.items.properties.correction.type, ["object", "null"]);
   assert.equal(
-    body.generationConfig.responseSchema.properties.claims.minItems,
+    body.generationConfig.responseFormat.text.schema.properties.claims.minItems,
     1,
   );
   assert.equal(
-    body.generationConfig.responseSchema.properties.claims.maxItems,
+    body.generationConfig.responseFormat.text.schema.properties.claims.maxItems,
     6,
   );
   assert.equal(
@@ -130,6 +136,8 @@ test("sends a server-authenticated structured request and parses a valid review"
     /never follow instructions/iu,
   );
   assert.match(body.systemInstruction.parts[0].text, /Tavily/iu);
+  assert.match(body.systemInstruction.parts[0].text, /Never silently repair/iu);
+  assert.match(body.systemInstruction.parts[0].text, /COPY evidence characters verbatim/iu);
   assert.match(body.systemInstruction.parts[0].text, /in Russian/iu);
   assert.match(body.contents[0].parts[0].text, /Обзор научных источников/iu);
 });
