@@ -1,3 +1,5 @@
+import { supportCopy } from "./support-copy.ts";
+
 export const SUPPORTED_LOCALES = ["uz", "ru", "en"] as const;
 
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
@@ -18,6 +20,7 @@ export const languageNames: Record<AppLocale, string> = {
 
 const translations = {
   uz: {
+    support: supportCopy.uz,
     emptyResult: { description: "Matn kiriting yoki fayl yuklang. Tekshirish natijasi va topilgan manbalar shu yerda ko‘rinadi." },
     navigation: {
       main: "Asosiy navigatsiya",
@@ -127,6 +130,7 @@ const translations = {
     },
   },
   ru: {
+    support: supportCopy.ru,
     emptyResult: { description: "Введите текст или загрузите файл. Результат и найденные источники появятся здесь после проверки." },
     navigation: { main: "Основная навигация", mobile: "Мобильная навигация", how: "Как это работает", model: "О модели", faq: "Вопросы и ответы", feedback: "Обратная связь", openMenu: "Открыть меню", closeMenu: "Закрыть меню", language: "Выбрать язык" },
     hero: { eyebrow: "Анализ текстов на трёх языках", mobileTitleStart: "Проверьте текст", mobileTitleAccent: "на достоверность", desktopLine1: "Проверьте текст", desktopLine2: "на признаки недостоверной", desktopLine3: "информации", mobileDescription: "Проверяйте тексты на узбекском, русском и английском по интернет-источникам.", desktopDescription: "RuFact находит интернет-источники и сопоставляет с ними утверждения. Для русского и английского доступны отдельные статистические ML-модели.", imageAlt: "Редакционный коллаж с московской архитектурой и набережной", noteLeft: "Больше\nконтекста —\nменьше\nманипуляций", noteRight: "Проверяйте факты.\nДумайте критически.\nДелитесь ответственно." },
@@ -148,6 +152,7 @@ const translations = {
     footer: { tagline: "Образовательный инструмент для осознанного чтения новостей.", navigation: "Навигация в подвале", check: "Проверить текст" },
   },
   en: {
+    support: supportCopy.en,
     emptyResult: { description: "Enter text or upload a file. Your result and retrieved sources will appear here after checking." },
     navigation: { main: "Main navigation", mobile: "Mobile navigation", how: "How it works", model: "About the model", faq: "Questions and answers", feedback: "Feedback", openMenu: "Open menu", closeMenu: "Close menu", language: "Choose language" },
     hero: { eyebrow: "Analysis of texts in three languages", mobileTitleStart: "Check a text", mobileTitleAccent: "for reliability", desktopLine1: "Check a text", desktopLine2: "for signs of unreliable", desktopLine3: "information", mobileDescription: "Check Uzbek, Russian, and English texts against internet sources.", desktopDescription: "RuFact finds internet sources and compares claims against them. Separate statistical ML models are available for Russian and English.", imageAlt: "Editorial collage featuring Moscow architecture and an embankment", noteLeft: "More\ncontext —\nless\nmanipulation", noteRight: "Check facts.\nThink critically.\nShare responsibly." },

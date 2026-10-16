@@ -3,10 +3,11 @@ import "server-only";
 import { createHmac, createHash, randomUUID } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import { getGeminiAssessment } from "./gemini-review";
-import { redisCredentials, rateLimitTelegramInternet, rateLimitTelegramRequest } from "./rate-limit";
-import { handleTelegramMessage, type TelegramMessage, type TelegramStore } from "./telegram-core";
+import { redisCredentials, rateLimitTelegramInternet, rateLimitTelegramRequest, rateLimitTelegramSupport } from "./rate-limit";
+import { handleTelegramMessage, handleTelegramPaymentUpdate, type TelegramMessage, type TelegramPaymentUpdate, type TelegramStore } from "./telegram-core";
 import { telegramButtonCommand, telegramKeyboard } from "./telegram-ui";
 import { getAiChatReply } from "./ai-chat";
+import { createStarsInvoice, getSupportAvailability, handleStarsPreCheckout, handleStarsSuccessfulPayment } from "./support";
 
 const localStore = new Map<string, { value: string; expiry: number }>();
 let redisClient: Redis | undefined;
@@ -85,6 +86,11 @@ export async function processTelegramMessage(message: TelegramMessage, botToken:
     limit: (identifier, internet) => internet ? rateLimitTelegramInternet(identifier) : rateLimitTelegramRequest(identifier),
     assess: (text, locale) => getGeminiAssessment(text, locale, AbortSignal.timeout(25_000)),
     chat: (messages, locale) => getAiChatReply(messages, locale),
+    support: {
+      ...getSupportAvailability(),
+      limit: rateLimitTelegramSupport,
+      createInvoice: createStarsInvoice,
+    },
     typing: async incoming => {
       await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -106,7 +112,8 @@ export async function processTelegramMessage(message: TelegramMessage, botToken:
           // Chat reads as one conversation; assessments retain their quoted input.
           ...(chatMode ? {} : { reply_parameters: { message_id: incoming.messageId, allow_sending_without_reply: true } }),
           link_preview_options: { is_disabled: true },
-          reply_markup: telegramKeyboard(locale, url.href, telegramButtonCommand(incoming.text) === "/language", chatMode),
+          reply_markup: telegramKeyboard(locale, url.href, telegramButtonCommand(incoming.text) === "/language", chatMode,
+            /^\/donate(?:@[A-Za-z0-9_]+)?$/i.test(telegramButtonCommand(incoming.text)) && getSupportAvailability().starsEnabled),
         }),
         cache: "no-store",
         signal: AbortSignal.timeout(8000),
@@ -115,5 +122,13 @@ export async function processTelegramMessage(message: TelegramMessage, botToken:
       const body = await response.json() as { ok?: boolean };
       if (body.ok !== true) throw new Error("Telegram delivery failed");
     },
+  });
+}
+
+/** Confirmed money events never pass through message or AI quota gates. */
+export async function processTelegramPayment(update: TelegramPaymentUpdate) {
+  await handleTelegramPaymentUpdate(update, {
+    preCheckout: handleStarsPreCheckout,
+    successfulPayment: handleStarsSuccessfulPayment,
   });
 }

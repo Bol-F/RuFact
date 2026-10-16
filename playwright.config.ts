@@ -8,6 +8,9 @@ const inheritedEnvironment = Object.fromEntries(
   ),
 );
 const useProductionServer = process.env.PLAYWRIGHT_USE_START === "1";
+// This fixture uses fake credentials and intercepted browser requests only.
+// Never use it for live payment validation or against a production server.
+const supportFixture = process.env.SUPPORT_STARS_E2E === "1" && !useProductionServer;
 const testServiceEnvironment = {
   ...inheritedEnvironment,
   // Default CI/development tests use the in-memory limiter, never a developer's
@@ -22,6 +25,14 @@ const testServiceEnvironment = {
   RATE_LIMIT_HASH_SECRET:
     "playwright-only-rate-limit-secret-with-at-least-32-bytes",
   RATE_LIMIT_NAMESPACE: `rufact-e2e-${process.pid}`,
+  SUPPORT_STARS_ENABLED: supportFixture ? "true" : "false",
+  SUPPORT_WALLET_ENABLED: "false",
+  SUPPORT_CONTACT_URL: supportFixture ? "https://support.example.invalid/help" : "",
+  ...(supportFixture ? {
+    TELEGRAM_BOT_TOKEN: ["123456789", "playwright_fake_bot_token_no_live_payments"].join(":"),
+    UPSTASH_REDIS_REST_URL: "https://redis.example.invalid",
+    UPSTASH_REDIS_REST_TOKEN: "playwright-fake-redis-token",
+  } : {}),
   GEMINI_REVIEW_ENABLED:
     process.env.LIVE_GEMINI_E2E === "1"
       ? inheritedEnvironment.GEMINI_REVIEW_ENABLED ?? "true"

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { parseTelegramUpdate, verifyTelegramSecret } from "@/lib/server/telegram-core";
-import { processTelegramMessage } from "@/lib/server/telegram";
+import { parseTelegramPaymentUpdate, parseTelegramUpdate, verifyTelegramSecret } from "@/lib/server/telegram-core";
+import { processTelegramMessage, processTelegramPayment } from "@/lib/server/telegram";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -40,9 +40,16 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers });
   }
-  const message = parseTelegramUpdate(update);
-  if (!message) return NextResponse.json({ ok: true }, { headers });
   try {
+    const payment = parseTelegramPaymentUpdate(update);
+    if (payment) {
+      // Pre-checkout has a 10-second Telegram deadline. Payment handlers also
+      // remain active when new support or ordinary AI requests are disabled.
+      await processTelegramPayment(payment);
+      return NextResponse.json({ ok: true }, { headers });
+    }
+    const message = parseTelegramUpdate(update);
+    if (!message) return NextResponse.json({ ok: true }, { headers });
     const status = await processTelegramMessage(message, botToken);
     // Retry active deliveries instead of acknowledging work that has not finished.
     return NextResponse.json({ ok: status !== "busy" }, { status: status === "busy" ? 503 : 200, headers });

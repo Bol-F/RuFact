@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { telegramCommandRegistrations } from "./telegram-commands.mjs";
 
 const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
 const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
@@ -32,22 +33,15 @@ try {
       body: "{}", signal: AbortSignal.timeout(10_000),
     });
     if (!health.ok) throw new Error("Deploy the bot environment variables first: the webhook configuration check failed.");
-    await call("setMyCommands", { commands: [
-      { command: "start", description: "Start / Boshlash / Начать" },
-      { command: "chat", description: "AI chat / AI suhbat / AI-чат" },
-      { command: "check", description: "Check text / Tekshirish / Проверка текста" },
-      { command: "new", description: "Clear conversation / Yangi suhbat / Новый разговор" },
-      { command: "stop", description: "End chat / Chatni tugatish / Завершить чат" },
-      { command: "uz", description: "O‘zbekcha · Lotin / Kirill" },
-      { command: "ru", description: "Русский" },
-      { command: "en", description: "English" },
-      { command: "help", description: "Help / Yordam / Помощь" },
-      { command: "privacy", description: "Privacy / Maxfiylik / Конфиденциальность" },
-      { command: "forget", description: "Clear saved language / Tilni o‘chirish" },
-    ] });
+    // Telegram selects these menus from its user's language, independently of
+    // the bot's saved response preference. Unknown languages use Uzbek.
+    for (const registration of telegramCommandRegistrations()) {
+      await call("setMyCommands", registration);
+    }
     await call("setWebhook", {
       url: new URL("/api/telegram/webhook", url).href,
-      secret_token: secret, allowed_updates: ["message"], max_connections: 4,
+      // successful_payment is a field on message; it is not an update type.
+      secret_token: secret, allowed_updates: ["message", "pre_checkout_query"], max_connections: 4,
     });
     const bot = await call("getMe");
     console.log(`Ready: https://t.me/${bot.username}`);

@@ -10,10 +10,13 @@ const DEFAULT_EXTRACT_WINDOW_SECONDS = 60;
 const DEFAULT_INTERNET_LIMIT = 5;
 const DEFAULT_INTERNET_WINDOW_SECONDS = 300;
 const DEFAULT_INTERNET_DAILY_LIMIT = 30;
+const DEFAULT_SUPPORT_LIMIT = 5;
+const DEFAULT_SUPPORT_WINDOW_SECONDS = 600;
+const DEFAULT_SUPPORT_DAILY_LIMIT = 100;
 const REDIS_REQUEST_TIMEOUT_MS = 2_500;
 const RATE_LIMIT_TIMEOUT_MS = 3_000;
 
-type RateLimitScope = "analyze" | "extract" | "internet" | "internet-global" | "telegram";
+type RateLimitScope = "analyze" | "extract" | "internet" | "internet-global" | "telegram" | "support" | "support-global";
 
 interface MemoryWindow {
   count: number;
@@ -37,6 +40,18 @@ function positiveInteger(value: string | undefined, fallback: number) {
 }
 
 function rateLimitSettings(scope: RateLimitScope) {
+  if (scope === "support") {
+    return {
+      limit: positiveInteger(process.env.SUPPORT_RATE_LIMIT_MAX, DEFAULT_SUPPORT_LIMIT),
+      windowSeconds: positiveInteger(process.env.SUPPORT_RATE_LIMIT_WINDOW_SECONDS, DEFAULT_SUPPORT_WINDOW_SECONDS),
+    };
+  }
+  if (scope === "support-global") {
+    return {
+      limit: positiveInteger(process.env.SUPPORT_DAILY_LIMIT, DEFAULT_SUPPORT_DAILY_LIMIT),
+      windowSeconds: 86_400,
+    };
+  }
   if (scope === "telegram") {
     return { limit: 10, windowSeconds: 60 };
   }
@@ -167,7 +182,7 @@ function getDistributedLimiter(
       signal: () => AbortSignal.timeout(REDIS_REQUEST_TIMEOUT_MS),
     }),
     limiter:
-      scope === "internet-global"
+      scope === "internet-global" || scope === "support-global"
         ? Ratelimit.fixedWindow(limit, `${windowSeconds} s`)
         : Ratelimit.slidingWindow(limit, `${windowSeconds} s`),
     prefix: `${namespace}:${scope}`,
@@ -245,6 +260,20 @@ export async function rateLimitTelegramInternet(identifier: string) {
   const perUser = await rateLimitRequest(new Request("https://telegram.invalid"), "internet", `telegram:${identifier}`);
   if (!perUser.configured || !perUser.allowed) return perUser;
   return rateLimitRequest(new Request("https://telegram.invalid"), "internet-global", "daily-provider-budget");
+}
+
+// Invoice creation has its own budget; payments never consume the AI/search allowance.
+export async function rateLimitSupportRequest(request: Request) {
+  const perClient = await rateLimitRequest(request, "support");
+  if (!perClient.configured || !perClient.allowed) return perClient;
+  return rateLimitRequest(request, "support-global", "daily-invoice-budget");
+}
+
+export async function rateLimitTelegramSupport(identifier: string) {
+  const request = new Request("https://telegram.invalid");
+  const perUser = await rateLimitRequest(request, "support", `telegram:${identifier}`);
+  if (!perUser.configured || !perUser.allowed) return perUser;
+  return rateLimitRequest(request, "support-global", "daily-invoice-budget");
 }
 
 export function rateLimitHeaders(result: AnalysisRateLimit) {

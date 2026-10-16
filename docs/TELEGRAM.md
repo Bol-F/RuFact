@@ -9,7 +9,7 @@ probabilities and use no search/Gemini quota; general abuse limits still apply.
 
 ## Create the bot
 
-1. Open the official [@BotFather](https://t.me/BotFather) in Telegram, send `/newbot`, choose a display name and an available username ending in `bot`.
+1. RuFact already uses [@RuFact_bot](https://t.me/RuFact_bot). Reuse it; do not create a second bot for support. For a separate installation only, create your own bot through the official [@BotFather](https://t.me/BotFather).
 2. Save the token in `.env.local` as `TELEGRAM_BOT_TOKEN`. Never paste it into chat or commit it.
 3. Generate a separate webhook secret:
 
@@ -30,7 +30,11 @@ npm run telegram:setup -- register
 npm run telegram:setup -- status
 ```
 
-Registration verifies the deployed secret, creates the command menu and registers `https://rufact.vercel.app/api/telegram/webhook`. It does not discard pending updates. The output includes the bot link. [Telegram's API documentation](https://core.telegram.org/bots/api#setwebhook) explains webhook delivery and secret headers.
+Registration verifies the deployed secret, creates the localized command menu and registers `https://rufact.vercel.app/api/telegram/webhook` with `allowed_updates: ["message", "pre_checkout_query"]`. Successful payments arrive within `message`, not a separate update type. It does not discard pending updates. Run registration only after the owner approves deployment; this feature's implementation does not register or modify a live webhook. [Telegram's API documentation](https://core.telegram.org/bots/api#setwebhook) explains delivery and secret headers.
+
+Command menus are registered separately for `uz`, `ru` and `en`, with Uzbek as the
+fallback. Telegram chooses the menu from its client's language; `/uz`, `/ru` and
+`/en` change bot replies independently, not the Telegram client's own language.
 
 ## Use
 
@@ -43,6 +47,9 @@ Registration verifies the deployed secret, creates the command menu and register
 - `/check your text`: explicit text check.
 - `/privacy`: explain third-party processing and temporary storage.
 - `/forget`: remove language preference, chat mode and conversation context.
+- `/donate` or **❤️ Support RuFact**: voluntary Stars support menu; `/donate 50`, `/donate 100`, `/donate 250` or the amount buttons create a one-time invoice only when explicitly enabled. Chat/check mode and conversation history stay unchanged.
+- `/paysupport`: monitored payment-help/refund contact, available even after ordinary message quota is exhausted.
+- `/terms`: voluntary support, receipt-retention and payment-confirmation notice.
 
 Maximum input: 5000 characters (Telegram's own message limit also applies). Captions are analyzed as text; images, voice, and document contents are not extracted by the bot. Each reply links to the website for file uploads. Private chats only; group, bot and unsupported updates are acknowledged without checking content.
 
@@ -57,6 +64,34 @@ Redis keys use the application namespace and bot-token fingerprint. Atomic 90-se
 Transport delivery is at-least-once: a crash after Telegram accepts a reply but before Redis records completion can still produce a duplicate reply. This does not guarantee exactly-once messaging. Slow checks may trigger retries while the lease prevents duplicate searches. The function duration is 60 seconds; source checking has a 25-second deadline and Telegram sending an 8-second deadline. At higher traffic, move processing to a durable queue.
 
 ## Verify
+
+### Stars payments (disabled until owner approval)
+
+Use the same bot token, secret webhook and Redis. New server-only settings are
+`SUPPORT_STARS_ENABLED=false`, `SUPPORT_CONTACT_URL` (a real monitored HTTPS help
+contact), `SUPPORT_RATE_LIMIT_MAX=5`, `SUPPORT_RATE_LIMIT_WINDOW_SECONDS=600`,
+`SUPPORT_DAILY_LIMIT=100` and reserved `SUPPORT_WALLET_ENABLED=false`.
+Strong webhook and rate-limit secrets, Redis credentials and a support contact
+are all required before readiness can turn true. The optional AI keys/ML service
+are not required by the payment flow.
+
+Invoices use `XTR`, an empty `provider_token`, one price and no subscription.
+Pre-checkout performs an atomic reservation and answers within a bounded
+Redis/API budget; Telegram requires an answer within 10 seconds, including
+delivery and cold-start time. Validate real latency in Telegram's test environment
+before enabling acceptance. A verified `successful_payment` must match the
+approved transaction, payer, amount, currency and unique charge ID before a
+receipt and localized thank-you are produced. Confirmations bypass AI budgets and
+remain processable after new invoices are disabled. Pending invoices are usable
+for 15 minutes and retained for 24 hours; approved unpaid checkout metadata and
+paid receipts are retained for 90 days. `/forget` does not erase those financial
+records. Duplicate events cannot record a second receipt; a crash at send time
+may still duplicate a thank-you message.
+
+Full activation, isolated testing, reconciliation and manual refund procedure:
+[SUPPORT.md](SUPPORT.md). Wallet remains unimplemented and unavailable.
+
+### Existing bot verification
 
 ```bash
 npm run test:telegram

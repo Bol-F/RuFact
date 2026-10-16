@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { AppLocale } from "../i18n";
 import type { GeminiAssessment } from "./gemini-review-core";
-import { escapeTelegramHtml, telegramButtonCommand, telegramNotice, telegramUi } from "./telegram-ui.ts";
+import { escapeTelegramHtml, telegramButtonCommand, telegramNotice, telegramSupportCopy, telegramUi } from "./telegram-ui.ts";
 import { parseChatMessages, recentChatMessages, safeChatSources, type ChatMessage, type ChatReply } from "../chat.ts";
 import { localChatReply } from "../chat-local.ts";
 import { claimCopy } from "../claim-copy.ts";
@@ -69,6 +69,9 @@ export function verifyTelegramSecret(received: string | null, expected: string |
 export function parseTelegramUpdate(value: unknown): TelegramMessage | null {
   if (!value || typeof value !== "object") return null;
   const update = value as Record<string, unknown>;
+  // Payment service messages must never become empty fact-check requests, even
+  // if their payment fields are malformed or an alternate caller uses this parser.
+  if (parseTelegramPaymentUpdate(value)) return null;
   if (!Number.isSafeInteger(update.update_id) || (update.update_id as number) < 0) return null;
   if (!update.message || typeof update.message !== "object") return null;
   const message = update.message as Record<string, unknown>;
@@ -84,6 +87,96 @@ export function parseTelegramUpdate(value: unknown): TelegramMessage | null {
     text: typeof message.text === "string" ? message.text.trim() : typeof message.caption === "string" ? message.caption.trim() : "",
     language: language === "ru" || language === "en" ? language : "uz",
   };
+}
+
+export interface TelegramPreCheckoutEvent {
+  queryId: string;
+  userId: number;
+  currency: string;
+  totalAmount: number;
+  invoicePayload: string;
+  languageCode?: string;
+}
+
+export interface TelegramSuccessfulPaymentEvent {
+  chatId: number;
+  userId: number;
+  currency: string;
+  totalAmount: number;
+  invoicePayload: string;
+  telegramPaymentChargeId: string;
+  providerPaymentChargeId?: string;
+}
+
+export type TelegramPaymentUpdate =
+  | { kind: "pre_checkout"; event: TelegramPreCheckoutEvent }
+  | { kind: "successful_payment"; event: TelegramSuccessfulPaymentEvent }
+  | { kind: "ignored_payment" };
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function boundedPaymentString(value: unknown, maxBytes: number) {
+  return typeof value === "string" && value.length > 0 && Buffer.byteLength(value, "utf8") <= maxBytes && !/[\u0000-\u001f\u007f]/u.test(value) ? value : null;
+}
+
+/** Separately discriminates financial updates before chat parsing or AI limits. */
+export function parseTelegramPaymentUpdate(value: unknown): TelegramPaymentUpdate | null {
+  const update = record(value);
+  if (!update) return null;
+  const message = record(update.message);
+  const edited = record(update.edited_message);
+  const hasCheckout = Object.hasOwn(update, "pre_checkout_query");
+  const hasPayment = !!message && Object.hasOwn(message, "successful_payment");
+  const editedPayment = !!edited && Object.hasOwn(edited, "successful_payment");
+  if (!hasCheckout && !hasPayment && !editedPayment) return null;
+  const ignored: TelegramPaymentUpdate = { kind: "ignored_payment" };
+  if (!Number.isSafeInteger(update.update_id) || (update.update_id as number) < 0 || editedPayment
+    || Object.keys(update).length !== 2 || (hasCheckout && !!message)) return ignored;
+  if (hasCheckout) {
+    const query = record(update.pre_checkout_query);
+    const from = record(query?.from);
+    const queryId = boundedPaymentString(query?.id, 256);
+    if (!query || !queryId || !from || from.is_bot !== false || !Number.isSafeInteger(from.id) || (from.id as number) <= 0) return ignored;
+    const languageCode = boundedPaymentString(from.language_code, 32);
+    // Preserve a valid query ID so malformed financial fields receive an explicit
+    // refusal within Telegram's deadline instead of falling through to AI chat.
+    return { kind: "pre_checkout", event: {
+      queryId, userId: from.id as number,
+      currency: boundedPaymentString(query.currency, 16) ?? "",
+      totalAmount: Number.isSafeInteger(query.total_amount) ? query.total_amount as number : -1,
+      invoicePayload: boundedPaymentString(query.invoice_payload, 128) ?? "",
+      ...(languageCode && /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u.test(languageCode) ? { languageCode } : {}),
+    } };
+  }
+  if (!message) return ignored;
+  const chat = record(message.chat);
+  const from = record(message.from);
+  const payment = record(message.successful_payment);
+  if (!chat || chat.type !== "private" || !Number.isSafeInteger(chat.id) || (chat.id as number) <= 0
+    || !from || from.is_bot !== false || from.id !== chat.id
+    || !Number.isSafeInteger(message.message_id) || (message.message_id as number) <= 0 || !payment) return ignored;
+  const currency = boundedPaymentString(payment.currency, 16);
+  const invoicePayload = boundedPaymentString(payment.invoice_payload, 128);
+  const telegramPaymentChargeId = boundedPaymentString(payment.telegram_payment_charge_id, 256);
+  if (!currency || !invoicePayload || !telegramPaymentChargeId || !Number.isSafeInteger(payment.total_amount) || (payment.total_amount as number) <= 0) return ignored;
+  if (payment.provider_payment_charge_id !== undefined && payment.provider_payment_charge_id !== "" && !boundedPaymentString(payment.provider_payment_charge_id, 256)) return ignored;
+  // Recurring/physical-goods fields are not part of this one-off support flow.
+  if (payment.is_recurring === true || payment.is_first_recurring === true || payment.subscription_expiration_date !== undefined || payment.shipping_option_id !== undefined || payment.order_info !== undefined) return ignored;
+  return { kind: "successful_payment", event: {
+    chatId: chat.id as number, userId: from.id as number, currency,
+    totalAmount: payment.total_amount as number, invoicePayload, telegramPaymentChargeId,
+    ...(typeof payment.provider_payment_charge_id === "string" ? { providerPaymentChargeId: payment.provider_payment_charge_id } : {}),
+  } };
+}
+
+export async function handleTelegramPaymentUpdate(update: TelegramPaymentUpdate, handlers: {
+  preCheckout: (event: TelegramPreCheckoutEvent) => Promise<void>;
+  successfulPayment: (event: TelegramSuccessfulPaymentEvent) => Promise<void>;
+}) {
+  if (update.kind === "pre_checkout") await handlers.preCheckout(update.event);
+  if (update.kind === "successful_payment") await handlers.successfulPayment(update.event);
 }
 
 function shorten(text: string, length: number) {
@@ -175,7 +268,45 @@ export interface TelegramDependencies {
   assess: (text: string, locale: AppLocale) => Promise<GeminiAssessment>;
   chat?: (messages: ChatMessage[], locale: AppLocale) => Promise<ChatReply>;
   typing?: (message: TelegramMessage) => Promise<void>;
+  support?: {
+    starsEnabled: boolean;
+    contactUrl: string | null;
+    limit: (identifier: string) => Promise<{ allowed: boolean; configured: boolean }>;
+    createInvoice: (input: { amount: number; locale: AppLocale; telegramUserId: number }) => Promise<{ url: string }>;
+  };
   send: (message: TelegramMessage, text: string, locale: AppLocale, chatMode?: boolean) => Promise<void>;
+}
+
+function supportContact(locale: AppLocale, contactUrl: string | null | undefined) {
+  const copy = telegramSupportCopy[locale];
+  if (contactUrl) {
+    try {
+      const url = new URL(contactUrl);
+      if (url.protocol === "https:" && !url.username && !url.password) {
+        return `<b>${escapeTelegramHtml(copy.paySupport)}</b>\n\n${escapeTelegramHtml(copy.contact)}\n\n<a href="${escapeTelegramHtml(url.href)}">${escapeTelegramHtml(copy.contactLink)}</a>`;
+      }
+    } catch { /* Missing or unsafe contact must not become a payment link. */ }
+  }
+  return `${copy.paySupport}\n\n${copy.noContact}`;
+}
+
+async function donationReply(message: TelegramMessage, locale: AppLocale, argument: string | undefined, identifier: string, deps: TelegramDependencies) {
+  const copy = telegramSupportCopy[locale];
+  const intro = `<b>${escapeTelegramHtml(copy.title)}</b>\n\n${escapeTelegramHtml(copy.description)}`;
+  if (!deps.support?.starsEnabled) return `${intro}\n\n${escapeTelegramHtml(copy.disabled)}`;
+  if (!argument) return `${intro}\n\n${escapeTelegramHtml(copy.choose)}\n\n/terms · /paysupport`;
+  if (!/^(50|100|250)$/.test(argument.trim())) return `${intro}\n\n${escapeTelegramHtml(copy.invalid)}`;
+  try {
+    const limit = await deps.support.limit(identifier);
+    if (!limit.configured || !limit.allowed) return `${intro}\n\n${escapeTelegramHtml(limit.configured ? botCopy[locale].limited : copy.unavailable)}`;
+    const { url: invoiceUrl } = await deps.support.createInvoice({ amount: Number(argument.trim()), locale, telegramUserId: message.chatId });
+    const url = new URL(invoiceUrl);
+    if (url.protocol !== "https:" || url.hostname !== "t.me" || !url.pathname.startsWith("/$") || url.username || url.password || url.port || url.hash || url.search) throw new Error("Invalid invoice URL");
+    return `${intro}\n\n<a href="${escapeTelegramHtml(url.href)}">${escapeTelegramHtml(copy.invoice)} · ${Number(argument.trim())} ⭐</a>\n\n${escapeTelegramHtml(copy.pending)}\n\n/terms · /paysupport`;
+  } catch {
+    // Payment/transport errors may contain a token-bearing URL. Never echo them.
+    return `${intro}\n\n${escapeTelegramHtml(copy.unavailable)}`;
+  }
 }
 
 export function formatTelegramChat(reply: ChatReply, locale: AppLocale) {
@@ -225,10 +356,16 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
       const command = commandMatch?.[1]?.toLowerCase();
       const generalLimit = await deps.limit(identifier, false);
       if (!generalLimit.configured) throw new Error("Telegram protection unavailable");
-      if (!generalLimit.allowed && command !== "stop" && command !== "forget") {
+      if (!generalLimit.allowed && !["stop", "forget", "paysupport", "terms", "privacy"].includes(command ?? "")) {
         reply = botCopy[locale].limited;
       } else {
-        if (command === "uz" || command === "ru" || command === "en") {
+        if (command === "donate") {
+          reply = await donationReply(message, locale, commandMatch?.[2], identifier, deps);
+        } else if (command === "paysupport") {
+          reply = supportContact(locale, deps.support?.contactUrl);
+        } else if (command === "terms") {
+          reply = `${telegramSupportCopy[locale].terms}\n\n${telegramSupportCopy[locale].termsBody}\n\n${telegramSupportCopy[locale].retention}`;
+        } else if (command === "uz" || command === "ru" || command === "en") {
           locale = command;
           await deps.store.set(languageKey, locale, 30 * 86_400);
           reply = chatMode
@@ -258,9 +395,9 @@ export async function handleTelegramMessage(message: TelegramMessage, deps: Tele
           chatMode = false;
           reply = botCopy[locale].forgotten;
         } else if (command === "privacy") {
-          reply = `${botCopy[locale].privacy}\n\n${arithmeticCopy[locale].title}: ${arithmeticCopy[locale].note}`;
+          reply = `${botCopy[locale].privacy}\n\n${arithmeticCopy[locale].title}: ${arithmeticCopy[locale].note}\n\n${telegramSupportCopy[locale].retention}`;
         } else if (command && command !== "check" && command !== "chat") {
-          reply = `${botCopy[locale].welcome}\n\n💬 /chat — AI chat\n🔎 /check — ${telegramUi[locale].check}\n🧹 /new — ${telegramUi[locale].clear}\n⏹ /stop — ${telegramUi[locale].stop}`;
+          reply = `${botCopy[locale].welcome}\n\n💬 /chat — AI chat\n🔎 /check — ${telegramUi[locale].check}\n🧹 /new — ${telegramUi[locale].clear}\n⏹ /stop — ${telegramUi[locale].stop}\n/donate — ${telegramSupportCopy[locale].button}\n/paysupport — ${telegramSupportCopy[locale].paySupport}`;
         } else {
           const text = (command === "check" || command === "chat" ? commandMatch?.[2] ?? "" : message.text).trim();
           if (command === "chat") {

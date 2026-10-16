@@ -22,6 +22,7 @@ export function Header() {
     { label: copy.navigation.how, href: "/#how-it-works" },
     { label: copy.navigation.model, href: "/model" },
     { label: copy.navigation.faq, href: "/#questions" },
+    { label: copy.support.nav, href: "/support" },
   ];
 
   return (
@@ -30,7 +31,7 @@ export function Header() {
         <Brand />
 
         <nav aria-label={copy.navigation.main} className="hidden xl:block">
-          <ul className="flex items-center gap-5 text-[0.875rem] font-medium text-[#173552] xl:gap-7">
+          <ul className="flex items-center gap-4 text-[0.875rem] font-medium text-[#173552]">
             {navigation.map((item) => (
               <li key={item.href}>
                 <Link

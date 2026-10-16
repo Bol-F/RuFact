@@ -57,6 +57,11 @@ export function Footer() {
               </Link>
             </li>
             <li>
+              <Link className="focus-ring rounded hover:text-white" href="/support">
+                {copy.support.nav}
+              </Link>
+            </li>
+            <li>
               <button
                 type="button"
                 onClick={() => openFeedback({ source: "footer" })}

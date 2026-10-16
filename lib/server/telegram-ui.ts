@@ -6,6 +6,63 @@ export const telegramUi = {
   en: { check: "🔎 Check text", chat: "💬 AI chat", language: "🌐 Language", help: "❔ Help", clear: "🧹 New conversation", stop: "⏹ End chat", stopped: "⏹ Chat ended and context cleared. You’re in fact-check mode. /chat — start again.", choose: "🌐 Choose a response language", checkMode: "🔎 Fact-check mode\n\nSend text or forward a message. I’ll find sources and compare its claims.", chatMode: "💬 RuFact AI chat\n\nAsk a question, then keep sending follow-ups — no need to repeat /chat. Factual questions use web sources.\n\nChat stays active until you select /stop or /check. The last 3 exchanges expire after 30 minutes of inactivity, but chat mode stays on. /new — new conversation. Don’t send personal data.", cleared: "🧹 New conversation started. Send a question — chat is still active.", typing: "Type a question or follow-up…", chatTitle: "RuFact · AI assistant" },
 };
 
+export const telegramSupportCopy = {
+  uz: {
+    button: "❤️ RuFact’ni qo‘llab-quvvatlash",
+    title: "❤️ RuFact’ni qo‘llab-quvvatlash",
+    description: "RuFact bepul loyiha. Ixtiyoriy yordamingiz xizmat va axborotni tekshirishni rivojlantirishga yordam beradi. To‘lov majburiy emas va qo‘shimcha tekshiruv yoki aniqroq javob bermaydi.",
+    choose: "Bir martalik Telegram Stars miqdorini tanlang: 50, 100 yoki 250 ⭐. /donate 50 kabi yozishingiz ham mumkin.",
+    disabled: "Telegram Stars orqali yordam hozircha yoqilmagan. Egasi talablar va ishga tayyorlikni tekshirgandan keyin uni yoqishi mumkin.",
+    invalid: "Faqat 50, 100 yoki 250 Stars tanlang: /donate 50, /donate 100 yoki /donate 250.",
+    invoice: "Telegram’da bir martalik yordam hisobini ochish",
+    pending: "Hali to‘lov tasdiqlanmadi. Faqat Telegram tasdiqlangan to‘lov xabarini yuborgandan keyin rahmat xabari keladi.",
+    unavailable: "Hozir hisob yaratib bo‘lmadi. Keyinroq urinib ko‘ring. Bu xabar to‘lov amalga oshganini bildirmaydi.",
+    paySupport: "🧾 To‘lov bo‘yicha yordam",
+    contact: "To‘lov yoki qaytarish masalasi uchun loyiha egasi bilan bog‘laning. Telegram to‘lov kvitansiyasini saqlang; maxfiy ma’lumotni ochiq GitHub issue’ga joylamang.",
+    contactLink: "Loyiha egasiga murojaat qilish",
+    noContact: "To‘lov yordami hali sozlanmagan, shuning uchun yangi to‘lovlar qabul qilinmaydi. Telegram’dagi kvitansiyani saqlang va RuFact saytining fikr bildirish bo‘limidan egasiga murojaat qiling; ochiq xabarda to‘lov identifikatorlarini ko‘rsatmang.",
+    terms: "📄 Ixtiyoriy yordam shartlari",
+    termsBody: "Bu bir martalik ixtiyoriy yordam, obuna yoki pullik xizmat emas. Tekshirish bepul qoladi; yordam javob aniqligiga yoki limitlarga ta’sir qilmaydi. Faqat Telegram va hududingizdagi to‘lov, yosh va boshqa talablariga mos bo‘lsangiz to‘lang. Telegram Stars TON yoki kriptovalyuta emas. Xatolik yoki qaytarish masalasi: /paysupport.",
+    retention: "To‘lov kvitansiyasi ma’lumotlari tekshirish va qaytarish uchun 90 kungacha alohida saqlanadi. /forget sozlamalar va AI kontekstini o‘chiradi, lekin tasdiqlangan to‘lov yozuvlarini o‘chirmaydi. Telegram o‘z qoidalariga ko‘ra kvitansiyalarni saqlaydi.",
+  },
+  ru: {
+    button: "❤️ Поддержать RuFact",
+    title: "❤️ Поддержать RuFact",
+    description: "RuFact — бесплатный проект. Добровольная поддержка помогает поддерживать сервис и развивать проверку информации. Платить необязательно: поддержка не даёт дополнительных проверок или более точных ответов.",
+    choose: "Выберите разовую поддержку: 50, 100 или 250 ⭐ Telegram Stars. Можно написать /donate 50.",
+    disabled: "Поддержка через Telegram Stars пока выключена. Владелец сможет включить её после проверки требований и готовности проекта.",
+    invalid: "Доступны только 50, 100 или 250 Stars: /donate 50, /donate 100 или /donate 250.",
+    invoice: "Открыть разовый счёт поддержки в Telegram",
+    pending: "Оплата ещё не подтверждена. Благодарность придёт только после подтверждённого Telegram события оплаты.",
+    unavailable: "Сейчас не удалось создать счёт. Попробуйте позже. Это сообщение не подтверждает оплату.",
+    paySupport: "🧾 Помощь с оплатой",
+    contact: "По вопросам оплаты или возврата обратитесь к владельцу проекта. Сохраните квитанцию Telegram; не публикуйте личные данные в открытом GitHub issue.",
+    contactLink: "Связаться с владельцем проекта",
+    noContact: "Поддержка по оплате ещё не настроена, поэтому новые платежи не принимаются. Сохраните квитанцию Telegram и обратитесь к владельцу через обратную связь на сайте RuFact; не публикуйте платёжные идентификаторы в открытом сообщении.",
+    terms: "📄 Условия добровольной поддержки",
+    termsBody: "Это разовая добровольная поддержка, а не подписка или платная услуга. Проверка остаётся бесплатной; поддержка не влияет на точность ответов и лимиты. Платите только при соблюдении требований Telegram, возрастных и региональных правил. Telegram Stars — не TON и не криптовалюта. Ошибка или возврат: /paysupport.",
+    retention: "Данные подтверждённой оплаты хранятся отдельно до 90 дней для сверки и возврата. /forget удаляет настройки и AI-контекст, но не подтверждённые платёжные записи. Telegram хранит квитанции по своим правилам.",
+  },
+  en: {
+    button: "❤️ Support RuFact",
+    title: "❤️ Support RuFact",
+    description: "RuFact is a free project. Voluntary support helps maintain the service and improve information checking. Payment is never required and does not unlock more checks or more accurate answers.",
+    choose: "Choose a one-off contribution: 50, 100 or 250 ⭐ Telegram Stars. You can also send /donate 50.",
+    disabled: "Telegram Stars support is currently disabled. The owner can enable it after checking eligibility and production readiness.",
+    invalid: "Only 50, 100 or 250 Stars are available: /donate 50, /donate 100 or /donate 250.",
+    invoice: "Open the one-off support invoice in Telegram",
+    pending: "Payment is not confirmed yet. A thank-you follows only after Telegram sends a confirmed payment event.",
+    unavailable: "An invoice could not be created right now. Please try later. This message does not confirm a payment.",
+    paySupport: "🧾 Payment support",
+    contact: "Contact the project owner about a payment or refund. Keep your Telegram receipt; do not post personal information in a public GitHub issue.",
+    contactLink: "Contact the project owner",
+    noContact: "Payment support is not configured yet, so new payments are not accepted. Keep your Telegram receipt and contact the owner through feedback on the RuFact website; never post payment identifiers publicly.",
+    terms: "📄 Voluntary support terms",
+    termsBody: "This is one-off voluntary support, not a subscription or a paid service. Checking remains free; support does not change answer accuracy or limits. Pay only if you meet Telegram, age and regional requirements. Telegram Stars are not TON or cryptocurrency. Payment issues or refunds: /paysupport.",
+    retention: "Confirmed payment records are stored separately for up to 90 days for reconciliation and refunds. /forget clears preferences and AI context, not confirmed payment records. Telegram retains receipts under its own policies.",
+  },
+};
+
 export function escapeTelegramHtml(text: string) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -16,6 +73,8 @@ export function telegramNotice(text: string) {
 }
 
 export function telegramButtonCommand(text: string) {
+  if (/^(50|100|250) ⭐$/.test(text)) return `/donate ${text.split(" ", 1)[0]}`;
+  if (Object.values(telegramSupportCopy).some(copy => copy.button === text)) return "/donate";
   const languages: Record<string, string> = { "🇺🇿 O‘zbekcha": "/uz", "🇷🇺 Русский": "/ru", "🇬🇧 English": "/en" };
   if (languages[text]) return languages[text];
   for (const copy of Object.values(telegramUi)) {
@@ -29,17 +88,24 @@ export function telegramButtonCommand(text: string) {
   return text;
 }
 
-export function telegramKeyboard(locale: AppLocale, webUrl: string, languages = false, chatMode = false) {
+export function telegramKeyboard(locale: AppLocale, webUrl: string, languages = false, chatMode = false, supportOptions = false) {
   const copy = telegramUi[locale];
+  const support = telegramSupportCopy[locale];
   return {
-    keyboard: languages ? [[{ text: "🇺🇿 O‘zbekcha" }, { text: "🇷🇺 Русский" }, { text: "🇬🇧 English" }], [{ text: chatMode ? copy.chat : copy.check }, { text: copy.help }]] : chatMode ? [
+    keyboard: supportOptions ? [
+      [{ text: "50 ⭐" }, { text: "100 ⭐" }, { text: "250 ⭐" }],
+      [{ text: chatMode ? copy.chat : copy.check }, { text: copy.language }],
+      [{ text: support.button }, { text: copy.help }],
+    ] : languages ? [[{ text: "🇺🇿 O‘zbekcha" }, { text: "🇷🇺 Русский" }, { text: "🇬🇧 English" }], [{ text: chatMode ? copy.chat : copy.check }, { text: copy.help }]] : chatMode ? [
       [{ text: copy.clear }, { text: copy.stop }],
       [{ text: copy.language }, { text: "↗ RuFact AI", web_app: { url: new URL("/chat", webUrl).href } }],
       [{ text: copy.check }, { text: copy.help }],
+      [{ text: support.button }],
     ] : [
       [{ text: copy.check }, { text: copy.chat }],
       [{ text: copy.clear }, { text: copy.language }],
       [{ text: copy.help }, { text: "↗ RuFact", web_app: { url: webUrl } }],
+      [{ text: support.button }],
     ],
     resize_keyboard: true,
     is_persistent: true,
