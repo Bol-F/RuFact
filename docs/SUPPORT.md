@@ -209,6 +209,31 @@ Telegram pending updates and Redis availability/eviction/backup health.
 
 ## Payment help, reconciliation and manual refunds
 
+### Non-payment Redis diagnostic
+
+`npm run check:support` skips without explicit network opt-in. To verify the actual
+Redis Lua transitions with configured local REST credentials, an operator may run:
+
+```bash
+npm run check:support -- --live-redis
+```
+
+This creates three synthetic records under a fresh random `support-diagnostic`
+namespace, caps their TTLs at five minutes, and deletes only the five enumerated
+diagnostic keys afterwards. It checks approval, 52-bit payer identifiers, wrong
+amount/payer rejection, duplicate receipts and thank-you leases. It never calls
+Telegram, creates an invoice, sends a message or processes a real payment. Output
+contains only status, check count and cleanup status; credentials are not printed.
+An incomplete cleanup is a failure; short TTLs bound the leftover synthetic data.
+
+Use a separately configured staging database for isolation when available. A pass
+only verifies the database selected by that process's environment; it does not
+prove production secrets match, credential rotation, provider eligibility, real
+checkout/refunds, or Telegram's ten-second pre-checkout deadline. Keep the owner
+activation checklist above. Do not enable payments with exposed Redis credentials.
+
+### Operator refund procedure
+
 Telegram requires bots to answer `/paysupport`; the operator, not Telegram, handles
 legitimate disputes. See the [official dispute/refund guidance](https://core.telegram.org/bots/payments-stars#q-how-are-disputes-handled).
 
