@@ -11,6 +11,7 @@ import subprocess
 import urllib.request
 import zipfile
 from collections import Counter
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -203,40 +204,65 @@ def _pair_group(row: dict[str, Any]) -> int:
 
 def load_main_dataset(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, int]]:
     rows = _read_json(path)
-    seen: set[str] = set()
+    seen: dict[str, tuple[int, int]] = {}
+    parents: dict[int, int] = {}
     texts: list[str] = []
     labels: list[int] = []
     groups: list[int] = []
     duplicates = 0
 
+    def root(group: int) -> int:
+        parents.setdefault(group, group)
+        while parents[group] != group:
+            parents[group] = parents[parents[group]]
+            group = parents[group]
+        return group
+
     for row in rows:
         text = normalize_for_model(str(row["data"]["text"]))
         if not text:
             continue
+        label = _main_label(row)
+        group = _pair_group(row)
+        root(group)
         if text in seen:
+            previous_label, previous_group = seen[text]
+            if previous_label != label:
+                raise ValueError("Main dataset contains conflicting labels for the same text.")
+            # Keeping just one duplicated text is not enough: the paired opposite-class
+            # rows must also stay in the same fold across all duplicate source IDs.
+            old_root, new_root = root(previous_group), root(group)
+            parents[max(old_root, new_root)] = min(old_root, new_root)
             duplicates += 1
             continue
-        seen.add(text)
+        seen[text] = (label, group)
         texts.append(text)
-        labels.append(_main_label(row))
-        groups.append(_pair_group(row))
+        labels.append(label)
+        groups.append(group)
 
     counts = Counter(labels)
+    merged_groups = np.asarray([root(group) for group in groups])
     summary = {
         "rawSamples": len(rows),
         "samples": len(texts),
         "real": counts[0],
         "fake": counts[1],
         "exactDuplicatesRemoved": duplicates,
+        "pairedGroupsBeforeDuplicateMerging": len(parents),
+        "leakageSafeGroups": len(set(merged_groups.tolist())),
     }
-    return np.asarray(texts, dtype=object), np.asarray(labels), np.asarray(groups), summary
+    return np.asarray(texts, dtype=object), np.asarray(labels), merged_groups, summary
 
 
 def load_external_dataset(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, int]]:
     rows = [row for row in _read_json(path) if row.get("Language") == "RU"]
+    if any(row.get("Class") not in {"REAL", "FAKE"} for row in rows):
+        raise ValueError("External Russian dataset contains an unknown class label.")
     texts = np.asarray([normalize_for_model(str(row["TEXT"])) for row in rows], dtype=object)
     labels = np.asarray([1 if row["Class"] == "FAKE" else 0 for row in rows])
     sources = np.asarray([str(row["Source"]) for row in rows], dtype=object)
+    if any(not text for text in texts) or any(not source.strip() for source in sources):
+        raise ValueError("External Russian dataset contains blank text or source metadata.")
     if len(set(texts.tolist())) != len(texts):
         raise RuntimeError("External Russian evaluation data contains exact duplicate texts.")
     counts = Counter(labels.tolist())
@@ -293,28 +319,39 @@ def load_lenta_dataset(
 ) -> tuple[np.ndarray, dict[str, int]]:
     texts: list[str] = []
     seen = set(excluded_texts)
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         ids = [str(row[0]) for row in connection.execute("SELECT id FROM tagged_texts")]
         ranked_ids = sorted(
             ids, key=lambda text_id: hashlib.sha256(f"{SEED}:{text_id}".encode()).digest()
         )
-        for text_id in ranked_ids:
-            row = connection.execute(
-                """
-                SELECT COALESCE(meta.textname, ''), tagged_texts.text
-                FROM tagged_texts
-                LEFT JOIN meta ON meta.textid = tagged_texts.id
-                WHERE tagged_texts.id = ?
-                """,
-                (text_id,),
-            ).fetchone()
-            if row is None:
-                continue
-            text = _text_from_tagged_document(str(row[0]), str(row[1]))
-            if not text or text in seen:
-                continue
-            seen.add(text)
-            texts.append(text)
+        # Fetch bounded batches rather than one SQL query per selected article. Keep
+        # the predeclared hash order: SQLite's IN clause does not preserve that order.
+        for offset in range(0, len(ranked_ids), 200):
+            batch = ranked_ids[offset : offset + 200]
+            placeholders = ",".join("?" for _ in batch)
+            records = {
+                str(row[0]): (str(row[1]), str(row[2]))
+                for row in connection.execute(
+                    f"""
+                    SELECT tagged_texts.id, COALESCE(meta.textname, ''), tagged_texts.text
+                    FROM tagged_texts
+                    LEFT JOIN meta ON meta.textid = tagged_texts.id
+                    WHERE tagged_texts.id IN ({placeholders})
+                    """,
+                    batch,
+                )
+            }
+            for text_id in batch:
+                row = records.get(text_id)
+                if row is None:
+                    continue
+                text = _text_from_tagged_document(*row)
+                if not text or text in seen:
+                    continue
+                seen.add(text)
+                texts.append(text)
+                if len(texts) == sample_size:
+                    break
             if len(texts) == sample_size:
                 break
 
@@ -375,6 +412,18 @@ def build_base_model() -> Pipeline:
             ),
         ]
     )
+
+
+def dataset_fingerprint(texts: np.ndarray, labels: np.ndarray) -> str:
+    """Bind reproducibility metadata to the ordered, normalized model inputs."""
+    if len(texts) != len(labels):
+        raise ValueError("Dataset text and label counts differ.")
+    digest = hashlib.sha256()
+    for text, label in zip(texts, labels, strict=True):
+        record = json.dumps([str(text), int(label)], ensure_ascii=False, separators=(",", ":"))
+        digest.update(record.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def _log_odds(probabilities: np.ndarray) -> np.ndarray:
@@ -458,7 +507,8 @@ def evaluate_internal(
     return {
         "protocol": (
             "5-fold stratified group cross-validation; paired REAL/FAKE source IDs stay "
-            "in the same fold; exact normalized duplicates removed"
+            "in the same fold; pair groups connected by duplicate texts are merged; "
+            "exact normalized duplicates removed"
         ),
         "samples": int(len(texts)),
         "metrics": _classification_metrics(labels, probabilities),
@@ -597,6 +647,10 @@ def train(force_download: bool = False) -> dict[str, Any]:
             "The external Russian evaluation set has only 157 Kazakhstan-focused texts "
             "and its labels are confounded with source."
         ),
+        (
+            "The external set was used for historical baseline comparisons; nested "
+            "calibration estimates are not a fresh, untouched release-test score."
+        ),
         "The model classifies wording patterns and does not retrieve or verify evidence.",
         "Confidence can become miscalibrated on new topics, sources, or adversarial paraphrases.",
         "Binary REAL/FAKE labels do not represent satire, opinion, or partially true claims.",
@@ -612,6 +666,8 @@ def train(force_download: bool = False) -> dict[str, Any]:
             "revision": DATASET_REVISION,
             "licenses": ["KazFakeCorpus: CC BY 4.0", "Taiga: personal/research use"],
             "training": training_summary,
+            "normalizedTrainingSha256": dataset_fingerprint(training_texts, training_labels),
+            "normalizedExternalSha256": dataset_fingerprint(external_texts, external_labels),
             "main": main_summary,
             "auxiliary": {
                 "fake": {
@@ -638,6 +694,13 @@ def train(force_download: bool = False) -> dict[str, Any]:
             },
         },
         "limitations": limitations,
+        "reproducibility": {
+            "seed": SEED,
+            "numpyVersion": np.__version__,
+            "sklearnVersion": sklearn.__version__,
+            "baseHyperparametersChangedInThisRun": False,
+            "externalSetUsedToTuneBaseModelInThisRun": False,
+        },
     }
     artifact = {
         "schema_version": 1,

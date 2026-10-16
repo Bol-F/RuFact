@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "filename": "model.joblib",
-  "sha256": "a7d43a44cd62b02a3f049e5e1938114f34e9e392669e4a2ae563394af7ba2795",
-  "bytes": 2989213,
+  "sha256": "29e6b629126028d81f9f8ddbad34831959ba7d4568d313c2ed6d3a8d2404ac20",
+  "bytes": 2989608,
   "modelVersion": "tfidf-word-char-logreg-ru-v2",
   "sklearnVersion": "1.9.1"
 }

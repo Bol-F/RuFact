@@ -6,9 +6,10 @@ resembles the labelled `REAL` or `FAKE` examples in its training data.
 
 ## What is trained
 
-The Russian v2 artifact remains unchanged. The separate English v1 baseline is
-trained on 8,127 deduplicated LIAR claims and scores **63.878% held-out accuracy**
-on 1,016 English claims (61.836% macro F1; majority baseline 54.724%). Its dataset
+The Russian v2 baseline has been retrained from the pinned data; external accuracy
+is unchanged at 80.89%. The separately retrained English v2 baseline uses 8,127
+deduplicated LIAR claims and scores **65.059% held-out accuracy** on 1,016 English
+claims (63.940% macro F1; majority baseline 54.724%). Its dataset
 is research-only and mostly US politics from 2007–2016. See
 [`ENGLISH_MODEL_CARD.md`](ENGLISH_MODEL_CARD.md) for rights, label mapping,
 leakage controls, errors and calibration. It is not a fact-checker.
@@ -21,12 +22,20 @@ This writes `artifacts/en/model.joblib`, `metrics.json` and `artifact-manifest.j
 without replacing Russian files. Both artifacts are committed for reproducible CPU
 deployment; raw datasets remain ignored. The API detects supported content language
 independently of UI locale. Uzbek/ambiguous text returns 422, not a Russian score.
-The Next.js layer can still return a source review without a statistical model.
+The Next.js layer checks recognized Uzbek directly through Tavily → Gemini,
+even when a legacy client sends `useGemini: false`. It never substitutes a Russian
+or English statistical score for an unavailable Uzbek source review.
+
+Retraining audits: [Russian](RUSSIAN_RETRAINING_2026_10_17.md) and
+[English](RETRAINING_EN_2026-10-16.md). Both benchmarks were used before this release;
+they are not new blind evaluations. English calibration uses training-only
+out-of-fold predictions; its validation split selects the final candidate.
 
 - word TF-IDF features with 1–2 word n-grams;
 - character TF-IDF features with 3–5 character n-grams;
 - balanced logistic regression;
-- a second sigmoid calibration layer fitted on authentic, out-of-domain examples;
+- a second sigmoid calibration layer (Russian: authentic out-of-domain examples;
+  English: training-only out-of-fold predictions);
 - exact phrase contributions from the linear model for local explanations.
 
 The core pipeline uses the Russian subset of

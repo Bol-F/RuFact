@@ -79,11 +79,11 @@ openssl rand -base64 48
 
 Образ включает две отдельные модели: русскую `artifacts/model.joblib` и английскую
 `artifacts/en/model.joblib`, каждую с SHA-256 manifest. Английская — исследовательское
-демо LIAR, 63.878% accuracy на 1,016 отложенных утверждениях; данные не лицензированы
+демо LIAR, 65.059% accuracy на 1,016 отложенных утверждениях; данные не лицензированы
 для коммерческого использования. Подробности: [English model card](../ml/ENGLISH_MODEL_CARD.md).
 Обычные значения JWT/ML_API_URL менять не нужно. После обновления перезапустите
 Render Docker deployment и проверьте `/health`: `availableModels` должен содержать
-`ru` и `en`, а `/model-info?language=en` — английскую версию `tfidf-word-char-logreg-en-v1`.
+`ru` и `en`, а `/model-info?language=en` — английскую версию `tfidf-word-char-logreg-en-v2`.
 Язык текста определяется отдельно от языка интерфейса. Узбекская модель пока не
 обучена; проверка источников работает независимо от доступности ML.
 

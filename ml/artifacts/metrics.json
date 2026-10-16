@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-02T05:46:20Z",
+  "generatedAt": "2026-10-16T19:02:12Z",
   "modelName": "RuFact Word + Character TF-IDF Logistic Regression (RU)",
   "modelVersion": "tfidf-word-char-logreg-ru-v2",
   "maxTextLength": 5000,
@@ -16,12 +16,16 @@
       "real": 1820,
       "fake": 1887
     },
+    "normalizedTrainingSha256": "f68f42d1a663c230a8af4d30695e09ecda8986804c48348f5532050d93b4066a",
+    "normalizedExternalSha256": "3cf8e0b8f25b7a4560c4dd8e4ae8ee5cb58e9ffeab2746e4f40e99681a34cc61",
     "main": {
       "rawSamples": 2106,
       "samples": 2039,
       "real": 986,
       "fake": 1053,
-      "exactDuplicatesRemoved": 67
+      "exactDuplicatesRemoved": 67,
+      "pairedGroupsBeforeDuplicateMerging": 1053,
+      "leakageSafeGroups": 986
     },
     "auxiliary": {
       "fake": {
@@ -57,7 +61,7 @@
   "evaluation": {
     "headline": "externalNestedCrossValidation",
     "inDomainGroupedCrossValidation": {
-      "protocol": "5-fold stratified group cross-validation; paired REAL/FAKE source IDs stay in the same fold; exact normalized duplicates removed",
+      "protocol": "5-fold stratified group cross-validation; paired REAL/FAKE source IDs stay in the same fold; pair groups connected by duplicate texts are merged; exact normalized duplicates removed",
       "samples": 2039,
       "metrics": {
         "accuracy": 0.997548,
@@ -67,8 +71,8 @@
         "precisionReal": 0.994955,
         "recallReal": 1.0,
         "rocAuc": 1.0,
-        "brierScore": 0.009055,
-        "logLoss": 0.067282,
+        "brierScore": 0.009012,
+        "logLoss": 0.066368,
         "confusionMatrix": [
           [
             986,
@@ -137,8 +141,16 @@
   "limitations": [
     "The core FAKE class is synthetic; auxiliary data contrasts Panorama satire with a deterministic Lenta news sample.",
     "The external Russian evaluation set has only 157 Kazakhstan-focused texts and its labels are confounded with source.",
+    "The external set was used for historical baseline comparisons; nested calibration estimates are not a fresh, untouched release-test score.",
     "The model classifies wording patterns and does not retrieve or verify evidence.",
     "Confidence can become miscalibrated on new topics, sources, or adversarial paraphrases.",
     "Binary REAL/FAKE labels do not represent satire, opinion, or partially true claims."
-  ]
+  ],
+  "reproducibility": {
+    "seed": 20260929,
+    "numpyVersion": "2.5.3",
+    "sklearnVersion": "1.9.1",
+    "baseHyperparametersChangedInThisRun": false,
+    "externalSetUsedToTuneBaseModelInThisRun": false
+  }
 }
