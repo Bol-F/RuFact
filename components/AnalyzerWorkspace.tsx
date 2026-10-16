@@ -6,6 +6,7 @@ import { analyzeText, getCalculationAnalysis, getMockAnalysis, type AnalysisResp
 import type { HistoryItem } from "@/lib/analysis-history";
 import { extractDocumentText } from "@/lib/document-upload";
 import { localeTags, type AppLocale } from "@/lib/i18n";
+import { detectTextLanguage } from "@/lib/text-language";
 import { AnalysisHistoryDialog } from "./AnalysisHistoryDialog";
 import { AnalysisResult, type AnalysisStatus } from "./AnalysisResult";
 import { type TextExample } from "./ExampleChips";
@@ -154,7 +155,10 @@ function AnalyzerWorkspaceSession({
     setStatus("loading");
 
     try {
-      const nextResult = await analyzeText(normalizedText, { useGemini, locale });
+      const nextResult = await analyzeText(normalizedText, {
+        useGemini: detectTextLanguage(normalizedText) === "uz" || useGemini,
+        locale,
+      });
       const analyzedAt = new Date();
       setResult(nextResult);
       setAnalyzedText(normalizedText);

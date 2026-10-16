@@ -41,18 +41,15 @@ interface TextAnalyzerProps {
 const MAX_LENGTH = 5000;
 const uzbekRoutingCopy = {
   uz: {
-    on: "O‘zbekcha matn bevosita Tavily → Gemini orqali tekshiriladi. Rus yoki ingliz ML modeli ishlatilmaydi.",
-    off: "O‘zbekcha matn uchun manbalar tekshiruvini yoqing. U o‘chirilgan bo‘lsa, natija tekshirilmagan bo‘lib qoladi.",
+    on: "O‘zbekcha matn har doim bevosita Tavily → Gemini orqali tekshiriladi. Rus yoki ingliz ML modeli ishlatilmaydi.",
     unavailable: "O‘zbekcha tekshiruv uchun serverda Tavily va Gemini sozlangan bo‘lishi kerak. Statistik ML modeli talab qilinmaydi.",
   },
   ru: {
-    on: "Узбекский текст проверяется напрямую через Tavily → Gemini, без русской или английской ML-модели.",
-    off: "Для узбекского текста включите проверку источников. Пока она выключена, результат останется непроверенным.",
+    on: "Узбекский текст всегда проверяется напрямую через Tavily → Gemini, без русской или английской ML-модели.",
     unavailable: "Для узбекской проверки нужны настроенные на сервере Tavily и Gemini. Статистическая ML-модель не требуется.",
   },
   en: {
-    on: "Uzbek text is checked directly through Tavily → Gemini, without the Russian or English ML models.",
-    off: "Enable source checking for Uzbek text. With it switched off, the result remains unverified.",
+    on: "Uzbek text is always checked directly through Tavily → Gemini, without the Russian or English ML models.",
     unavailable: "Uzbek checks need Tavily and Gemini configured on the server. A statistical ML model is not required.",
   },
 } as const;
@@ -82,6 +79,7 @@ export function TextAnalyzer({
   const isBusy = isLoading || isExtracting;
   const { locale, copy } = useLanguage();
   const isUzbekText = detectTextLanguage(text) === "uz";
+  const effectiveUseGemini = isUzbekText || useGemini;
 
   return (
     <article
@@ -218,16 +216,16 @@ export function TextAnalyzer({
         <label
           htmlFor="use-gemini"
           className={`flex items-start gap-2.5 sm:gap-3 ${
-            geminiConfigured ? "cursor-pointer" : "cursor-not-allowed"
+            geminiConfigured && !isUzbekText ? "cursor-pointer" : "cursor-not-allowed"
           }`}
         >
           <input
             id="use-gemini"
             type="checkbox"
             role="switch"
-            checked={useGemini}
-            disabled={isBusy || !geminiConfigured}
-            aria-describedby="gemini-option-description gemini-privacy-note"
+            checked={geminiConfigured && effectiveUseGemini}
+            disabled={isBusy || !geminiConfigured || isUzbekText}
+            aria-describedby={`gemini-option-description gemini-privacy-note${isUzbekText ? " uzbek-routing-note" : ""}`}
             onChange={(event) => onUseGeminiChange(event.target.checked)}
             className="focus-ring mt-0.5 h-4 w-4 shrink-0 accent-[#285b87] disabled:cursor-not-allowed"
           />
@@ -249,14 +247,14 @@ export function TextAnalyzer({
             >
               <span className="sm:hidden">
                 {geminiConfigured
-                  ? useGemini
+                  ? effectiveUseGemini
                     ? copy.analyzer.internetOn
                     : copy.analyzer.internetOff
                   : copy.analyzer.internetUnavailable}
               </span>
               <span className="hidden sm:inline">
                 {geminiConfigured
-                  ? useGemini
+                  ? effectiveUseGemini
                     ? copy.analyzer.internetOn
                     : copy.analyzer.internetOff
                   : copy.analyzer.internetUnavailable}
@@ -288,8 +286,8 @@ export function TextAnalyzer({
       </section>
 
       {isUzbekText || locale !== "ru" ? (
-        <p data-uzbek-routing={isUzbekText ? "source-only" : undefined} className="mt-2 rounded-[10px] border border-[#ead8b7] bg-[#fff8e9] px-3 py-2 text-[0.5625rem] leading-[1.4] text-[#7d6236] sm:text-[0.65625rem]">
-          {isUzbekText ? uzbekRoutingCopy[locale][!geminiConfigured ? "unavailable" : useGemini ? "on" : "off"] : copy.analyzer.languageNotice}
+        <p id="uzbek-routing-note" data-uzbek-routing={isUzbekText ? "source-only" : undefined} className="mt-2 rounded-[10px] border border-[#ead8b7] bg-[#fff8e9] px-3 py-2 text-[0.5625rem] leading-[1.4] text-[#7d6236] sm:text-[0.65625rem]">
+          {isUzbekText ? uzbekRoutingCopy[locale][geminiConfigured ? "on" : "unavailable"] : copy.analyzer.languageNotice}
         </p>
       ) : null}
 

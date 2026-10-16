@@ -65,7 +65,8 @@ test("Uzbek routing accepts both alphabets and common apostrophe variants", () =
   for (const apostrophe of ["'", "‘", "’", "ʻ", "ʼ", "`", "´"]) {
     assert.equal(detectTextLanguage(`Toshkent O${apostrophe}zbekistonning poytaxti.`), "uz");
   }
-  for (const text of ["Bu xabar rost emas va uning manbasi yo‘q.", "Бу хабар рост эмас ва унинг манбаси йўқ.", "Бу хабар рост эмас.", "Yer tekis."]) {
+  for (const text of ["Bu xabar rost emas va uning manbasi yo‘q.", "Бу хабар рост эмас ва унинг манбаси йўқ.", "Бу хабар рост эмас.", "Yer tekis.",
+    "Samarqand poytaxt.", "Samarqand O‘zbekistonning poytaxtidir.", "Самарканд Узбекистон пойтахти.", "Самарқанд Ўзбекистоннинг пойтахтидир."]) {
     assert.equal(detectTextLanguage(text), "uz");
   }
 });
@@ -78,40 +79,124 @@ test("quoted Uzbek names do not override English or Russian prose", () => {
   assert.equal(detectTextLanguage("中文文本"), "unknown");
   assert.equal(detectTextLanguage("abc абв"), "unknown");
   assert.equal(detectTextLanguage("https://example.org/english Bu xabar rost emas."), "uz");
+  assert.equal(detectTextLanguage("Москва — столица России, Ташкент — столица Узбекистана."), "ru");
+  assert.equal(detectTextLanguage("Узбекское слово «пойтахт» значит столица."), "ru");
+  assert.equal(detectTextLanguage("The word poytaxt means capital."), "en");
+  assert.equal(detectTextLanguage("Ташкент, Самарканд, Бухара"), "ru");
+  assert.equal(detectTextLanguage("London, Manchester, Samarkand"), "en");
 });
 
-test("Uzbek needs no ML configuration or JWT, and output locale does not change input routing", async () => {
-  for (const locale of ["uz", "ru", "en"]) {
-    let sources = 0;
-    const result = await resolveAnalysis({ text: "Бу хабар рост эмас.", locale, mlConfigured: false }, {
-      requestMl: async () => { assert.fail("Uzbek must never request ML"); },
-      getAssessment: async (text, outputLocale, inputLanguage) => {
-        sources += 1;
-        assert.equal(text, "Бу хабар рост эмас.");
-        assert.equal(outputLocale, locale);
-        assert.equal(inputLanguage, "uz");
-        return { status: "unavailable", provider: "gemini", reason: "no-search-results" };
-      },
-    });
-    assert.equal(sources, 1);
-    assert.equal(result.meta.inputLanguage, "uz");
-    assert.equal(getPublicVerdict(result).label, "UNSURE");
+test("Uzbek always uses guarded sources, never ML/JWT, for both alphabets, every UI locale and legacy opt-out", async () => {
+  for (const text of ["Bu xabar rost emas.", "Бу хабар рост эмас.", "Samarqand poytaxt.", "Самарканд Узбекистон пойтахти."]) {
+    for (const locale of ["uz", "ru", "en"]) {
+      for (const useGemini of [undefined, true, false]) {
+        for (const mlConfigured of [true, false]) {
+          let sources = 0;
+          let mlCalls = 0;
+          const result = await resolveAnalysis({ text, locale, useGemini, mlConfigured }, {
+            requestMl: async () => { mlCalls++; return { ok: false }; },
+            getAssessment: async (inputText, outputLocale, inputLanguage) => {
+              sources++;
+              assert.equal(inputText, text);
+              assert.equal(outputLocale, locale);
+              assert.equal(inputLanguage, "uz");
+              return { status: "unavailable", provider: "gemini", reason: "no-search-results" };
+            },
+          });
+          assert.equal(sources, 1);
+          assert.equal(mlCalls, 0);
+          assert.equal(result.meta.inputLanguage, "uz");
+          assert.equal(result.meta.externalSourcesChecked, false);
+          assert.equal(result.confidence, 0);
+          assert.equal(result.meta.engine, "unavailable");
+          assert.equal(getPublicVerdict(result).label, "UNSURE");
+          assert.equal(getPublicVerdict(result).confidence, null);
+        }
+      }
+    }
   }
 });
 
-test("opt-out and thrown provider failures cannot become a fabricated Uzbek score", async () => {
+test("legacy opt-out cannot skip Uzbek checks, and thrown provider failures never fabricate an ML score", async () => {
   const dependencies = {
     requestMl: async () => { assert.fail("Uzbek must never request ML"); },
     getAssessment: async () => { throw new Error("Sensitive provider message"); },
   };
   const input = { text: "Bu xabar rost emas.", locale: "uz", mlConfigured: true };
   const optedOut = await resolveAnalysis({ ...input, useGemini: false }, dependencies);
-  assert.equal(optedOut.geminiReview, undefined);
+  assert.deepEqual(optedOut.geminiReview, { status: "unavailable", provider: "gemini", reason: "upstream-error" });
   const failed = await resolveAnalysis(input, dependencies);
   assert.deepEqual(failed.geminiReview, { status: "unavailable", provider: "gemini", reason: "upstream-error" });
   assert.equal(failed.confidence, 0);
   assert.equal(getPublicVerdict(failed).confidence, null);
   assert.doesNotMatch(JSON.stringify(failed), /Sensitive/);
+});
+
+test("provider outages and quota refusals stay unavailable in every Uzbek script and UI language", async () => {
+  for (const text of ["Bu xabar rost emas.", "Бу хабар рост эмас."]) {
+    for (const locale of ["uz", "ru", "en"]) {
+      for (const reason of ["not-configured", "search-not-configured", "search-error", "search-rate-limited", "no-search-results", "rate-limited", "timeout", "blocked", "invalid-response"]) {
+        let mlCalls = 0;
+        const result = await resolveAnalysis({ text, locale, useGemini: false, mlConfigured: true }, {
+          requestMl: async () => { mlCalls++; return { ok: true, payload: { label: "REAL", confidence: 0.99 } }; },
+          getAssessment: async () => ({ status: "unavailable", provider: "gemini", reason }),
+        });
+        assert.equal(mlCalls, 0);
+        assert.equal(result.label, "UNSURE");
+        assert.equal(result.confidence, 0);
+        assert.equal(result.meta.externalSourcesChecked, false);
+        assert.equal(result.geminiReview.reason, reason);
+        assert.deepEqual(getPublicVerdict(result), { basis: "unavailable", label: "UNSURE", confidence: null, certainty: null, explanation: undefined });
+      }
+    }
+  }
+});
+
+test("verified source conclusions are the public Uzbek verdict, without inventing an ML probability", async () => {
+  for (const text of ["Toshkent O‘zbekistonning poytaxti.", "Тошкент Ўзбекистоннинг пойтахти."]) {
+    for (const locale of ["uz", "ru", "en"]) {
+      for (const label of ["REAL", "FAKE", "UNSURE"]) {
+        const assessment = {
+          status: "complete", provider: "gemini", model: "test", promptVersion: "misinfo-tavily-v4",
+          label, certainty: "high", explanation: "Verified source evidence determines this test verdict.",
+          warningSigns: [], coverage: "complete", externalSourcesChecked: true, searchQueries: [text],
+          sources: [{ id: "source-1", title: "Test source", url: "https://example.org/source" }],
+          claims: [{ id: "claim-1", quote: text, kind: "FACTUAL",
+            assessment: label === "REAL" ? "SUPPORTED" : label === "FAKE" ? "CONTRADICTED" : "UNVERIFIED",
+            explanation: "Verified source evidence determines this test claim.", needsExternalVerification: label === "UNSURE",
+            evidence: label === "UNSURE" ? [] : [{ sourceId: "source-1", quote: "Exact supporting or contradicting evidence for the test." }], correction: null }],
+        };
+        let mlCalls = 0;
+        const result = await resolveAnalysis({ text, locale, useGemini: false, mlConfigured: true }, {
+          requestMl: async () => { mlCalls++; return { ok: false }; },
+          getAssessment: async () => assessment,
+        });
+        assert.equal(mlCalls, 0);
+        assert.equal(result.label, "UNSURE", "No statistical label is fabricated");
+        assert.equal(result.meta.externalSourcesChecked, true);
+        assert.equal(result.geminiReview.agreesWithPrimary, null);
+        assert.deepEqual(getPublicVerdict(result), { basis: "sources", label, confidence: null, certainty: "high", explanation: assessment.explanation });
+      }
+    }
+  }
+});
+
+test("Russian and English retain their separate statistical route and optional source opt-out", async () => {
+  for (const text of ["Сегодня в Москве открылся новый городской парк.", "A new public park opened in London today."]) {
+    for (const locale of ["uz", "ru", "en"]) {
+      let mlCalls = 0;
+      let sources = 0;
+      const result = await resolveAnalysis({ text, locale, useGemini: false, mlConfigured: true }, {
+        requestMl: async () => { mlCalls++; return { ok: true, payload: { label: "REAL", confidence: 0.88,
+          meta: { engine: "external-model", engineVersion: "test", language: detectTextLanguage(text), externalSourcesChecked: false } } }; },
+        getAssessment: async () => { sources++; return { status: "unavailable", provider: "gemini", reason: "not-configured" }; },
+      });
+      assert.equal(mlCalls, 1);
+      assert.equal(sources, 0);
+      assert.equal(result.meta.engine, "external-model");
+      assert.equal(getPublicVerdict(result).basis, "statistical");
+    }
+  }
 });
 
 test("client keeps Uzbek source-only metadata but never trusts checked=true without valid evidence", async () => {

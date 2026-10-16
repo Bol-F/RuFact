@@ -6,6 +6,10 @@ const CYRILLIC = /\p{Script=Cyrillic}/u;
 const LETTER = /\p{L}/u;
 const UZBEK_LETTERS = /[ўқғҳ]/gu;
 const UZBEK_APOSTROPHE = /\b(?:o'|g'|bo'l|to'g'|ma'lumot|e'lon|ta'lim)[a-z]*/gu;
+// A city alone is not a language signal. These forms are Uzbek linguistic markers,
+// including Cyrillic text typed without the special Ў character.
+const UZBEK_LATIN_MARKER = /^(?:poytaxt(?:i|idir|dir|ga|da)?|o'zbek(?:cha|iston(?:ning|da|dan|ga)?)?|uzbek(?:cha|iston(?:ning|da|dan|ga)?)?)$/u;
+const UZBEK_CYRILLIC_MARKER = /^(?:пойтахт(?:и|идир|дир|га|да)?|[ўу]збек(?:ча|истон(?:нинг|да|дан|га)?)?)$/u;
 const uzbekLatin = new Set([
   "va", "bu", "uchun", "bilan", "ham", "emas", "bir", "deb", "bo'lgan", "shuningdek",
   "orqali", "yoki", "haqida", "uning", "ular", "edi", "bo'ladi", "tomonidan", "kerak",
@@ -19,10 +23,12 @@ const uzbekCyrillic = new Set([
 const english = new Set([
   "the", "and", "is", "are", "was", "were", "of", "to", "in", "that", "for", "on", "with",
   "as", "by", "from", "this", "it", "has", "have", "will", "an", "be", "or", "not", "which", "who",
+  "capital", "means", "word", "translated",
 ]);
 const russian = new Set([
   "и", "в", "на", "что", "это", "как", "по", "из", "для", "не", "от", "но", "уже", "был",
   "она", "они", "который", "сообщил", "об", "статье", "говорится",
+  "слово", "значит", "столица", "столицей", "является",
 ]);
 
 export function detectTextLanguage(text: string): TextLanguage {
@@ -41,20 +47,22 @@ export function detectTextLanguage(text: string): TextLanguage {
   if (letters < 3) return "unknown";
   const tokens = normalized.match(/\p{L}+(?:'\p{L}+)*/gu) ?? [];
   if (cyrillic / letters >= 0.6) {
-    const uzScore = tokens.filter(token => uzbekCyrillic.has(token) || token.startsWith("ўзбекистон")).length;
+    const hasUzbekMarker = tokens.some(token => UZBEK_CYRILLIC_MARKER.test(token));
+    const uzScore = tokens.filter(token => uzbekCyrillic.has(token) || UZBEK_CYRILLIC_MARKER.test(token)).length;
     const ruScore = tokens.filter(token => russian.has(token)).length;
     const specialLetters = normalized.match(UZBEK_LETTERS)?.length ?? 0;
     if (ruScore >= 2 && ruScore > uzScore + 1) return "ru";
-    if (specialLetters >= 2 || (specialLetters >= 1 && uzScore >= 1 && uzScore > ruScore) ||
+    if ((hasUzbekMarker && uzScore > ruScore) || specialLetters >= 2 || (specialLetters >= 1 && uzScore >= 1 && uzScore > ruScore) ||
         (uzScore >= 2 && uzScore > ruScore)) return "uz";
     return "ru";
   }
   if (latin / letters >= 0.6) {
-    const uzScore = tokens.filter(token => uzbekLatin.has(token) || token.startsWith("o'zbekiston")).length;
+    const hasUzbekMarker = tokens.some(token => UZBEK_LATIN_MARKER.test(token));
+    const uzScore = tokens.filter(token => uzbekLatin.has(token) || UZBEK_LATIN_MARKER.test(token)).length;
     const enScore = tokens.filter(token => english.has(token)).length;
     const apostrophes = normalized.match(UZBEK_APOSTROPHE)?.length ?? 0;
     if (enScore >= 2 && enScore > uzScore + 1) return "en";
-    if ((apostrophes >= 1 && uzScore >= 1 && uzScore > enScore) ||
+    if ((hasUzbekMarker && uzScore > enScore) || (apostrophes >= 1 && uzScore >= 1 && uzScore > enScore) ||
         (uzScore >= 2 && uzScore > enScore)) return "uz";
     return "en";
   }

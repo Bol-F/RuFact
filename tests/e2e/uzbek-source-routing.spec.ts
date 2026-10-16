@@ -115,7 +115,7 @@ async function fakeProviders(mode: ProviderMode = "complete") {
 test("Latin and Cyrillic Uzbek go directly through Tavily then Gemini in every output locale", async () => {
   const providers = await fakeProviders();
   try {
-    for (const text of [LATIN_TEXT, CYRILLIC_TEXT, "Toshkent O‘zbekistonning poytaxti."]) {
+    for (const text of [LATIN_TEXT, CYRILLIC_TEXT, "Toshkent O‘zbekistonning poytaxti.", "Samarqand poytaxt.", "Самарканд Узбекистон пойтахти."]) {
       for (const locale of ["uz", "en", "ru"] as const) {
         const before = providers.calls.length;
         const result = await resolveAnalysis({ text, locale, mlConfigured: true }, providers.deps);
@@ -143,20 +143,21 @@ test("Latin and Cyrillic Uzbek go directly through Tavily then Gemini in every o
   }
 });
 
-test("explicitly disabling source verification sends Uzbek to neither ML nor providers", async () => {
+test("legacy useGemini:false cannot bypass the mandatory Uzbek source path in any interface language", async () => {
   const providers = await fakeProviders();
   try {
     for (const text of [LATIN_TEXT, CYRILLIC_TEXT]) {
       for (const locale of ["uz", "ru", "en"] as const) {
+        const before = providers.calls.length;
         const result = await resolveAnalysis({ text, locale, useGemini: false, mlConfigured: true }, providers.deps);
         expect(result.label).toBe("UNSURE");
         expect(result.meta?.engine).toBe("unavailable");
-        expect(getPublicVerdict(result)).toMatchObject({ label: "UNSURE", confidence: null });
-        expect(result.geminiReview?.status).not.toBe("complete");
+        expect(getPublicVerdict(result)).toMatchObject({ basis: "sources", label: "REAL", confidence: null });
+        expect(result.geminiReview?.status).toBe("complete");
+        expect(providers.calls.slice(before).map(call => call.kind)).toEqual(["tavily", "gemini"]);
       }
     }
-    expect(providers.calls).toEqual([]);
-    expect(providers.assessmentInputs).toEqual([]);
+    expect(providers.assessmentInputs).toHaveLength(6);
     expect(providers.mlCalls()).toBe(0);
   } finally {
     await providers.close();
@@ -239,7 +240,7 @@ test("supported Russian and English content still calls ML regardless of interfa
   }
 });
 
-test("POST still validates input and CSRF before an opted-out Uzbek check returns an unverified result", async ({ request }, testInfo) => {
+test("POST validates input and CSRF before a legacy Uzbek request attempts configured source verification", async ({ request }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop"), "Server validation once");
   const headers = { "x-vercel-forwarded-for": `2001:db8:${process.pid.toString(16)}:a::1` };
   expect((await request.post("/api/analyze", { headers: { ...headers, origin: "https://evil.example" }, data: { text: LATIN_TEXT, useGemini: false } })).status()).toBe(403);
@@ -251,10 +252,10 @@ test("POST still validates input and CSRF before an opted-out Uzbek check return
   expect(valid.headers()["cache-control"]).toBe("private, no-store");
   const result = await valid.json() as AnalysisResponse;
   expect(result).toMatchObject({ label: "UNSURE", confidence: 0, meta: { engine: "unavailable", engineVersion: "uzbek-source-only-v1", inputLanguage: "uz" } });
-  expect(result.geminiReview?.status).not.toBe("complete");
+  expect(result.geminiReview).toMatchObject({ status: "unavailable", reason: "not-configured" });
 });
 
-test("public analyze rate limiting still returns 429 for repeated Uzbek source-opt-out requests", async ({ request }, testInfo) => {
+test("public analyze rate limiting still returns 429 for repeated legacy Uzbek requests", async ({ request }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop"), "Server rate-limit regression once");
   test.setTimeout(90_000);
   const configuredLimit = Number.parseInt(process.env.RATE_LIMIT_MAX_REQUESTS ?? "10", 10);
@@ -278,12 +279,14 @@ test("Uzbek source-only replies render usable links, no ML score, and no runtime
   page.on("console", message => { if (message.type() === "error" || message.type() === "warning") errors.push(message.text()); });
   const providers = await fakeProviders();
   const locale = testInfo.project.name.startsWith("mobile") ? "uz" : "en";
+  const analyzeInputs: { text: string; locale: AppLocale; useGemini?: boolean }[] = [];
   try {
     await page.route("**/api/analyze", async route => {
-      const input = route.request().postDataJSON() as { text: string; locale: AppLocale };
+      const input = route.request().postDataJSON() as { text: string; locale: AppLocale; useGemini?: boolean };
+      analyzeInputs.push(input);
       // The existing isolated server suite disables live provider calls. This fixture
       // proves provider parsers → orchestration → client sanitization → rendered UI.
-      await route.fulfill({ json: await resolveAnalysis({ ...input, useGemini: true, mlConfigured: true }, providers.deps) });
+      await route.fulfill({ json: await resolveAnalysis({ ...input, useGemini: false, mlConfigured: true }, providers.deps) });
     });
     await page.goto("/");
     await expect(page).toHaveURL(/\/$/);
@@ -292,9 +295,21 @@ test("Uzbek source-only replies render usable links, no ML score, and no runtime
     await expect(page.locator(".analysis-result")).toBeVisible();
     await expect(page.locator("nextjs-portal [role=dialog]")).toHaveCount(0);
     await changeLanguage(page, locale);
+    const sourceSwitch = page.locator("#use-gemini");
+    const sourceConfigurationAvailable = await sourceSwitch.isEnabled();
+    if (sourceConfigurationAvailable) {
+      // Remember a real opt-out for supported English/Russian content. Uzbek must
+      // temporarily force sources without resetting that preference for other text.
+      await page.locator("#analysis-text").fill("A new public park opened in London today.");
+      await sourceSwitch.uncheck();
+      await expect(sourceSwitch).not.toBeChecked();
+    }
     for (const text of [LATIN_TEXT, CYRILLIC_TEXT]) {
       await page.locator("#analysis-text").fill(text);
       await expect(page.locator('[data-uzbek-routing="source-only"]')).toContainText("Tavily");
+      await expect(sourceSwitch).toBeDisabled();
+      if (sourceConfigurationAvailable) await expect(sourceSwitch).toBeChecked();
+      else await expect(sourceSwitch).not.toBeChecked();
       await page.locator(".analyzer-submit").click();
       const verdict = page.locator('[data-verdict-basis="sources"]');
       await expect(verdict).toHaveAttribute("data-verdict-label", "REAL");
@@ -304,6 +319,13 @@ test("Uzbek source-only replies render usable links, no ML score, and no runtime
       const source = page.locator('.analysis-result details[open] a[href="https://example.org/uzbek-routing-source"]');
       await expect(source).toBeVisible();
       await expect(source).toHaveAttribute("target", "_blank");
+      expect(analyzeInputs.at(-1)).toEqual({ text, locale, useGemini: true });
+    }
+    if (sourceConfigurationAvailable) {
+      await page.locator("#analysis-text").fill("A new public park opened in London today.");
+      await expect(sourceSwitch).toBeEnabled();
+      await expect(sourceSwitch).not.toBeChecked();
+      await page.locator("#analysis-text").fill(CYRILLIC_TEXT);
     }
     expect(providers.mlCalls()).toBe(0);
     expect(providers.calls.map(call => call.kind)).toEqual(["tavily", "gemini", "tavily", "gemini"]);

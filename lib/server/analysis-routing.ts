@@ -27,7 +27,9 @@ export async function resolveAnalysis(
   if (calculation) return calculation;
   const inputLanguage = detectTextLanguage(input.text);
   const isUzbek = inputLanguage === "uz";
-  const needsSources = input.useGemini === true || (isUzbek && input.useGemini === undefined);
+  // Uzbek has no statistical model. Its verification path is always Tavily → Gemini,
+  // including requests from older clients which still send useGemini:false.
+  const needsSources = isUzbek || input.useGemini === true;
   const canRunMl = input.mlConfigured && (inputLanguage === "ru" || inputLanguage === "en");
   const [mlResult, assessment] = await Promise.all([
     canRunMl ? dependencies.requestMl(input.text).catch(() => ({ ok: false as const }))
