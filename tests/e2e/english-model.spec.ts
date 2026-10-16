@@ -12,7 +12,7 @@ test("English content uses the real English artifact even in Russian UI", async 
   await page.locator('.analyzer-submit').click();
   const result = await (await response).json();
   expect(result.meta.language).toBe('en');
-  expect(result.meta.engineVersion).toBe('tfidf-word-char-logreg-en-v1');
+  expect(result.meta.engineVersion).toBe('tfidf-word-char-logreg-en-v2');
   await expect(page.locator('[data-verdict-basis="statistical"]')).toBeVisible();
   await expect(page.locator('.analysis-result')).toContainText('ML-модель · EN');
   await expect(page.locator('[data-verdict-basis="statistical"]')).not.toContainText(/(?:^|\s)REAL(?:\s|$)/);
@@ -23,7 +23,7 @@ for (const sourceLabel of ['FAKE', 'UNSURE'] as const) {
 test(`source ${sourceLabel} replaces a green REAL headline, without a fabricated fact percentage`, async ({ page }) => {
   await page.route('**/api/analyze', route => route.fulfill({ json: {
     ...analysisFixture('REAL', 0.62),
-    meta: { engine: 'external-model', engineVersion: 'tfidf-word-char-logreg-en-v1', language: 'en', externalSourcesChecked: false },
+    meta: { engine: 'external-model', engineVersion: 'tfidf-word-char-logreg-en-v2', language: 'en', externalSourcesChecked: false },
     geminiReview: {
       status: 'complete', provider: 'gemini', model: 'test-model', promptVersion: 'misinfo-tavily-v3',
       label: sourceLabel, certainty: 'medium', agreesWithPrimary: sourceLabel === 'UNSURE' ? null : false,
@@ -65,7 +65,7 @@ test("model-info shows separate English held-out quality and research-use limita
   await page.goto('/model');
   await changeLanguage(page, 'en');
   const section = page.locator('section[aria-labelledby="english-quality-heading"]');
-  await expect(section).toContainText('63.9%');
+  await expect(section).toContainText('65.1%');
   await expect(section).toContainText('1,016');
   await expect(section).toContainText('research-use-only');
   await expect(section).toContainText('not a fact-check');

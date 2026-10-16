@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-12T11:16:00Z",
+  "generatedAt": "2026-10-16T18:57:29Z",
   "language": "en",
-  "modelVersion": "tfidf-word-char-logreg-en-v1",
+  "modelVersion": "tfidf-word-char-logreg-en-v2",
   "modelName": "RuFact English LIAR Word + Character TF-IDF Logistic Regression",
   "maxTextLength": 5000,
   "seed": 20261012,
@@ -105,132 +105,155 @@
   "evaluation": {
     "headline": "heldOutTest",
     "modelSelection": {
-      "samples": 518,
-      "selectedC": 1.0,
-      "criterion": "macroF1; fixed threshold 0.5; tie prefers lower C",
+      "samples": 1036,
+      "selectedC": 0.25,
+      "criterion": "calibrated macroF1 on all validation claims; fixed threshold 0.5; tie prefers lower C",
       "candidates": {
         "0.25": {
-          "accuracy": 0.681467,
-          "macroF1": 0.675013,
-          "precisionFake": 0.75265,
-          "recallFake": 0.691558,
-          "precisionReal": 0.595745,
-          "recallReal": 0.666667,
-          "rocAuc": 0.737539,
-          "brierScore": 0.216898,
-          "logLoss": 0.624651,
+          "accuracy": 0.670849,
+          "macroF1": 0.648176,
+          "precisionFake": 0.701318,
+          "recallFake": 0.777597,
+          "precisionReal": 0.611898,
+          "recallReal": 0.514286,
+          "rocAuc": 0.722928,
+          "brierScore": 0.207826,
+          "logLoss": 0.601944,
           "confusionMatrix": [
             [
-              140,
-              70
+              216,
+              204
             ],
             [
-              95,
-              213
+              137,
+              479
             ]
           ]
         },
         "1.0": {
-          "accuracy": 0.694981,
-          "macroF1": 0.687528,
-          "precisionFake": 0.758621,
-          "recallFake": 0.714286,
-          "precisionReal": 0.614035,
-          "recallReal": 0.666667,
-          "rocAuc": 0.736503,
-          "brierScore": 0.208273,
-          "logLoss": 0.604265,
+          "accuracy": 0.664093,
+          "macroF1": 0.645377,
+          "precisionFake": 0.703647,
+          "recallFake": 0.751623,
+          "precisionReal": 0.595238,
+          "recallReal": 0.535714,
+          "rocAuc": 0.721718,
+          "brierScore": 0.207913,
+          "logLoss": 0.602258,
           "confusionMatrix": [
             [
-              140,
-              70
+              225,
+              195
             ],
             [
-              88,
-              220
+              153,
+              463
             ]
           ]
         },
         "4.0": {
-          "accuracy": 0.69112,
-          "macroF1": 0.68318,
-          "precisionFake": 0.753425,
-          "recallFake": 0.714286,
-          "precisionReal": 0.610619,
-          "recallReal": 0.657143,
-          "rocAuc": 0.722263,
-          "brierScore": 0.213421,
-          "logLoss": 0.619807,
+          "accuracy": 0.665058,
+          "macroF1": 0.645558,
+          "precisionFake": 0.702866,
+          "recallFake": 0.756494,
+          "precisionReal": 0.597855,
+          "recallReal": 0.530952,
+          "rocAuc": 0.70831,
+          "brierScore": 0.212171,
+          "logLoss": 0.612277,
           "confusionMatrix": [
             [
-              138,
-              72
+              223,
+              197
             ],
             [
-              88,
-              220
+              150,
+              466
             ]
           ]
         }
       }
     },
     "calibration": {
-      "samples": 518,
-      "method": "sigmoid on independent half of validation; C=1; no class reweighting"
+      "samples": 8127,
+      "folds": 5,
+      "method": "sigmoid on training-only stratified out-of-fold predictions; C=1; no class reweighting; every fold refits vocabulary and IDF",
+      "outOfFoldUncalibratedMetrics": {
+        "accuracy": 0.640089,
+        "macroF1": 0.637445,
+        "precisionFake": 0.679576,
+        "recallFake": 0.657595,
+        "precisionReal": 0.59488,
+        "recallReal": 0.618551,
+        "rocAuc": 0.683973,
+        "brierScore": 0.227937,
+        "logLoss": 0.647832,
+        "confusionMatrix": [
+          [
+            2254,
+            1390
+          ],
+          [
+            1535,
+            2948
+          ]
+        ]
+      }
     },
     "heldOutTest": {
       "protocol": "Official test split after deduplication; never used for fitting, selection, calibration or threshold tuning. Statement text only.",
+      "previouslyEvaluatedBenchmark": true,
       "samples": 1016,
       "metrics": {
-        "accuracy": 0.63878,
-        "macroF1": 0.618362,
-        "precisionFake": 0.635971,
-        "recallFake": 0.794964,
-        "precisionReal": 0.64486,
-        "recallReal": 0.45,
-        "rocAuc": 0.698287,
-        "brierScore": 0.219132,
-        "logLoss": 0.627307,
+        "accuracy": 0.650591,
+        "macroF1": 0.639398,
+        "precisionFake": 0.657277,
+        "recallFake": 0.755396,
+        "precisionReal": 0.639257,
+        "recallReal": 0.523913,
+        "rocAuc": 0.698436,
+        "brierScore": 0.217787,
+        "logLoss": 0.62493,
         "confusionMatrix": [
           [
-            207,
-            253
+            241,
+            219
           ],
           [
-            114,
-            442
+            136,
+            420
           ]
         ]
       },
       "uncalibratedMetrics": {
-        "accuracy": 0.643701,
-        "macroF1": 0.642098,
-        "precisionFake": 0.683712,
-        "recallFake": 0.649281,
-        "precisionReal": 0.60041,
-        "recallReal": 0.636957,
-        "rocAuc": 0.698287,
-        "brierScore": 0.219499,
-        "logLoss": 0.628391,
+        "accuracy": 0.637795,
+        "macroF1": 0.636068,
+        "precisionFake": 0.677358,
+        "recallFake": 0.645683,
+        "precisionReal": 0.59465,
+        "recallReal": 0.628261,
+        "rocAuc": 0.698436,
+        "brierScore": 0.224078,
+        "logLoss": 0.639557,
         "confusionMatrix": [
           [
-            293,
-            167
+            289,
+            171
           ],
           [
-            195,
-            361
+            197,
+            359
           ]
         ]
       },
       "confidenceIntervals": {
         "accuracy95": [
-          0.610236,
-          0.666339
+          0.621063,
+          0.679134
         ],
         "macroF195": [
-          0.587552,
-          0.648017
+          0.609231,
+          0.66808
         ]
       },
       "majorityBaseline": {
@@ -247,6 +270,7 @@
     "Half-true claims are excluded, so binary metrics do not cover ambiguous/partly true claims.",
     "Exact duplicates are removed, but paraphrases and shared speakers/topics may remain.",
     "Official random splits are not speaker-disjoint or time-separated.",
-    "Calibration and confidence can drift on current claims, other domains and languages."
+    "Calibration and confidence can drift on current claims, other domains and languages.",
+    "This public test benchmark was already evaluated for v1; the v2 test result is a repeated benchmark, not a newly collected blind evaluation."
   ]
 }

@@ -147,7 +147,7 @@ def test_english_routing_and_quality() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["meta"]["language"] == "en"
-        assert payload["meta"]["engineVersion"] == "tfidf-word-char-logreg-en-v1"
+        assert payload["meta"]["engineVersion"] == "tfidf-word-char-logreg-en-v2"
         assert "English" in payload["explanation"]
         assert client.get("/health").json()["availableModels"].keys() == {"ru", "en"}
         info = client.get("/model-info?language=en")
@@ -155,7 +155,7 @@ def test_english_routing_and_quality() -> None:
         assert info.json()["language"] == "en"
         test_metrics = info.json()["evaluation"]["heldOutTest"]
         assert test_metrics["samples"] == 1016
-        assert test_metrics["metrics"]["accuracy"] == 0.63878
+        assert test_metrics["metrics"]["accuracy"] == 0.650591
         for evidence in payload["evidence"]:
             assert "Trump has six wives"[evidence["start"] : evidence["end"]] == evidence["quote"]
 

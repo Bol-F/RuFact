@@ -17,7 +17,7 @@ import numpy as np
 import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import FeatureUnion, Pipeline
 
 from rufact_ml.model import MAX_TEXT_LENGTH, normalize_for_model
@@ -32,7 +32,7 @@ from rufact_ml.training import (
 )
 
 SEED = 20261012
-MODEL_VERSION = "tfidf-word-char-logreg-en-v1"
+MODEL_VERSION = "tfidf-word-char-logreg-en-v2"
 MODEL_NAME = "RuFact English LIAR Word + Character TF-IDF Logistic Regression"
 ARTIFACT_DIR = ML_ROOT / "artifacts" / "en"
 LABEL_MAPPING = {"true": 0, "mostly-true": 0, "false": 1, "barely-true": 1, "pants-fire": 1}
@@ -179,41 +179,75 @@ def build_model(c_value: float) -> Pipeline:
     )
 
 
+def fit_calibrated_candidate(
+    train_texts: np.ndarray,
+    train_labels: np.ndarray,
+    c_value: float,
+    *,
+    folds: int = 5,
+) -> tuple[Pipeline, LogisticRegression, dict[str, Any]]:
+    """Fit calibration only on predictions of models that did not see each claim.
+
+    The feature union is inside each CV pipeline, so neither vocabulary nor IDF
+    statistics see the held-out fold. Validation is reserved for selection and
+    test data is not accepted by this function.
+    """
+    splitter = StratifiedKFold(n_splits=folds, shuffle=True, random_state=SEED)
+    out_of_fold = cross_val_predict(
+        build_model(c_value),
+        train_texts,
+        train_labels,
+        cv=splitter,
+        method="predict_proba",
+        n_jobs=1,
+    )[:, 1]
+    calibrator = LogisticRegression(C=1.0, solver="liblinear", random_state=SEED)
+    calibrator.fit(_log_odds(out_of_fold), train_labels)
+    model = build_model(c_value)
+    model.fit(train_texts, train_labels)
+    return model, calibrator, {
+        "samples": len(train_labels),
+        "folds": folds,
+        "method": "sigmoid on training-only stratified out-of-fold predictions; "
+        "C=1; no class reweighting; every fold refits vocabulary and IDF",
+        "outOfFoldUncalibratedMetrics": _classification_metrics(train_labels, out_of_fold),
+    }
+
+
 def train(force_download: bool = False) -> dict[str, Any]:
     dataset_path = ensure_dataset_file(DATASET_FILE, force=force_download)
     splits, summaries = load_dataset(dataset_path)
     train_texts, train_labels = splits["train"]
     valid_texts, valid_labels = splits["valid"]
     test_texts, test_labels = splits["test"]
-    selection_indices, calibration_indices = train_test_split(
-        np.arange(len(valid_labels)),
-        test_size=0.5,
-        random_state=SEED,
-        stratify=valid_labels,
-    )
     candidates: dict[str, Any] = {}
     selected_model = None
+    selected_calibrator = None
+    selected_calibration = None
     selected_c = 0.0
     best_f1 = -1.0
     for c_value in (0.25, 1.0, 4.0):
         print(f"Fitting English candidate C={c_value} on {len(train_labels)} claims...", flush=True)
-        model = build_model(c_value)
-        model.fit(train_texts, train_labels)
-        probabilities = model.predict_proba(valid_texts[selection_indices])[:, 1]
-        candidate_metrics = _classification_metrics(valid_labels[selection_indices], probabilities)
+        model, calibrator, calibration = fit_calibrated_candidate(
+            train_texts, train_labels, c_value
+        )
+        raw_validation = model.predict_proba(valid_texts)[:, 1]
+        probabilities = calibrator.predict_proba(_log_odds(raw_validation))[:, 1]
+        candidate_metrics = _classification_metrics(valid_labels, probabilities)
         candidates[str(c_value)] = candidate_metrics
         if candidate_metrics["macroF1"] > best_f1:
             best_f1 = candidate_metrics["macroF1"]
             selected_c = c_value
             selected_model = model
+            selected_calibrator = calibrator
+            selected_calibration = calibration
     assert selected_model is not None
-    calibrator = LogisticRegression(C=1.0, solver="liblinear", random_state=SEED)
-    calibration_probabilities = selected_model.predict_proba(valid_texts[calibration_indices])[:, 1]
-    calibrator.fit(_log_odds(calibration_probabilities), valid_labels[calibration_indices])
+    assert selected_calibrator is not None
+    assert selected_calibration is not None
     # The test split is used only here, after all model selection and calibration.
     raw_test = selected_model.predict_proba(test_texts)[:, 1]
-    calibrated_test = calibrator.predict_proba(_log_odds(raw_test))[:, 1]
-    print("Evaluating the untouched English test split...", flush=True)
+    calibrated_test = selected_calibrator.predict_proba(_log_odds(raw_test))[:, 1]
+    print("Evaluating the held-out English benchmark after freezing selection...", flush=True)
     majority_label = int(np.bincount(train_labels).argmax())
     generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     limitations = [
@@ -226,6 +260,8 @@ def train(force_download: bool = False) -> dict[str, Any]:
         "Exact duplicates are removed, but paraphrases and shared speakers/topics may remain.",
         "Official random splits are not speaker-disjoint or time-separated.",
         "Calibration and confidence can drift on current claims, other domains and languages.",
+        "This public test benchmark was already evaluated for v1; the v2 test result is a "
+        "repeated benchmark, not a newly collected blind evaluation.",
     ]
     metrics = {
         "schemaVersion": 1,
@@ -255,18 +291,17 @@ def train(force_download: bool = False) -> dict[str, Any]:
         "evaluation": {
             "headline": "heldOutTest",
             "modelSelection": {
-                "samples": len(selection_indices),
+                "samples": len(valid_labels),
                 "selectedC": selected_c,
-                "criterion": "macroF1; fixed threshold 0.5; tie prefers lower C",
+                "criterion": "calibrated macroF1 on all validation claims; fixed threshold 0.5; "
+                "tie prefers lower C",
                 "candidates": candidates,
             },
-            "calibration": {
-                "samples": len(calibration_indices),
-                "method": "sigmoid on independent half of validation; C=1; no class reweighting",
-            },
+            "calibration": selected_calibration,
             "heldOutTest": {
                 "protocol": "Official test split after deduplication; never used for fitting, "
                 "selection, calibration or threshold tuning. Statement text only.",
+                "previouslyEvaluatedBenchmark": True,
                 "samples": int(len(test_labels)),
                 "metrics": _classification_metrics(test_labels, calibrated_test),
                 "uncalibratedMetrics": _classification_metrics(test_labels, raw_test),
@@ -291,7 +326,7 @@ def train(force_download: bool = False) -> dict[str, Any]:
         "model_version": MODEL_VERSION,
         "trained_at": generated_at,
         "base_model": selected_model,
-        "calibrator": calibrator,
+        "calibrator": selected_calibrator,
         "metrics": metrics,
         "sklearn_version": sklearn.__version__,
         "dataset_revision": DATASET_FILE.sha256,
