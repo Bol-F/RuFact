@@ -1,6 +1,10 @@
 /** Public configuration only. Payment records and Telegram identifiers stay server-side. */
-export const STARS_AMOUNTS = [50, 100, 250] as const;
-export type StarsAmount = (typeof STARS_AMOUNTS)[number];
+export const STARS_AMOUNTS = [5, 10, 25] as const;
+export const STARS_MIN_AMOUNT = 1;
+// Application safety cap, not a claim about Telegram's platform maximum.
+export const STARS_MAX_AMOUNT = 10_000;
+/** Runtime validation is required at every untrusted payment boundary. */
+export type StarsAmount = number;
 
 export interface SupportAvailability {
   starsEnabled: boolean;
@@ -10,5 +14,6 @@ export interface SupportAvailability {
 }
 
 export function isStarsAmount(value: unknown): value is StarsAmount {
-  return typeof value === "number" && STARS_AMOUNTS.some(amount => amount === value);
+  return typeof value === "number" && Number.isSafeInteger(value) &&
+    value >= STARS_MIN_AMOUNT && value <= STARS_MAX_AMOUNT;
 }

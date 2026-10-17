@@ -47,7 +47,7 @@ fallback. Telegram chooses the menu from its client's language; `/uz`, `/ru` and
 - `/check your text`: explicit text check.
 - `/privacy`: explain third-party processing and temporary storage.
 - `/forget`: remove language preference, chat mode and conversation context.
-- `/donate` or **❤️ Support RuFact**: voluntary Stars support menu; `/donate 50`, `/donate 100`, `/donate 250` or the amount buttons create a one-time invoice only when explicitly enabled. Chat/check mode and conversation history stay unchanged.
+- `/donate` or **❤️ Support RuFact**: voluntary Stars support menu with **5 / 10 / 25** presets. `/donate 7` or another whole-number amount from **1 to 10,000 Stars** creates a one-time invoice only when explicitly enabled; this is an application safety cap. Chat/check mode and conversation history stay unchanged.
 - `/paysupport`: monitored payment-help/refund contact, available even after ordinary message quota is exhausted.
 - `/terms`: voluntary support, receipt-retention and payment-confirmation notice.
 

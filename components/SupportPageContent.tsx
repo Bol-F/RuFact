@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Clock3, ExternalLink, Heart, LoaderCircle
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { copyText } from "@/lib/copy-text";
-import { STARS_AMOUNTS, type StarsAmount, type SupportAvailability } from "@/lib/support";
+import { isStarsAmount, STARS_AMOUNTS, STARS_MAX_AMOUNT, STARS_MIN_AMOUNT, type StarsAmount, type SupportAvailability } from "@/lib/support";
 import { useFeedback } from "./FeedbackProvider";
 import { useLanguage } from "./LanguageProvider";
 
@@ -29,23 +29,39 @@ export function SupportPageContent({ availability }: { availability: SupportAvai
   const { locale, copy: translations } = useLanguage();
   const copy = translations.support;
   const { openFeedback } = useFeedback();
-  const [amount, setAmount] = useState<StarsAmount>(100);
+  const [amountChoice, setAmountChoice] = useState<StarsAmount | "custom">(10);
+  const [customAmount, setCustomAmount] = useState("");
   const [invoiceState, setInvoiceState] = useState<InvoiceState>("idle");
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<ShareState>("idle");
   const invoiceRequest = useRef<AbortController | null>(null);
   const loading = invoiceState === "loading";
+  const custom = amountChoice === "custom";
+  // Keep the user's input intact: decimals, exponents and signs must be rejected,
+  // never silently rounded, truncated or converted to a different contribution.
+  const parsedCustomAmount = /^[0-9]+$/.test(customAmount) ? Number(customAmount) : null;
+  const amount = custom ? (isStarsAmount(parsedCustomAmount) ? parsedCustomAmount : null) : amountChoice;
+  const customInvalid = custom && customAmount !== "" && amount === null;
+  const amountHint = copy.customAmountHint.replace("{min}", String(STARS_MIN_AMOUNT)).replace("{max}", String(STARS_MAX_AMOUNT));
+  const amountError = copy.customAmountError.replace("{min}", String(STARS_MIN_AMOUNT)).replace("{max}", String(STARS_MAX_AMOUNT));
 
   useEffect(() => () => invoiceRequest.current?.abort(), []);
 
   function selectAmount(nextAmount: StarsAmount) {
-    setAmount(nextAmount);
+    setAmountChoice(nextAmount);
+    setInvoiceUrl(null);
+    setInvoiceState("idle");
+  }
+
+  function selectCustomAmount(value: string = customAmount) {
+    setAmountChoice("custom");
+    setCustomAmount(value);
     setInvoiceUrl(null);
     setInvoiceState("idle");
   }
 
   async function createInvoice() {
-    if (!availability.starsEnabled || invoiceRequest.current) return;
+    if (!availability.starsEnabled || invoiceRequest.current || !isStarsAmount(amount)) return;
     const controller = new AbortController();
     invoiceRequest.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), 25_000);
@@ -115,20 +131,38 @@ export function SupportPageContent({ availability }: { availability: SupportAvai
             <legend className="sr-only">{copy.amountLegend}</legend>
             {STARS_AMOUNTS.map(value => (
               <label className="support-amount" key={value}>
-                <input className="sr-only" type="radio" name="stars-amount" value={value} checked={amount === value} onChange={() => selectAmount(value)} aria-label={copy.amountAria.replace("{amount}", String(value))} />
+                <input className="sr-only" type="radio" name="stars-amount" value={value} checked={!custom && amountChoice === value} onChange={() => selectAmount(value)} aria-label={copy.amountAria.replace("{amount}", String(value))} />
                 <span><strong>{value}</strong><Star size={16} fill="currentColor" aria-hidden="true" /></span>
               </label>
             ))}
           </fieldset>
+          <div className="support-custom-amount" data-active={custom}>
+            <label htmlFor="stars-custom-amount">{copy.customAmount}</label>
+            <div className="support-custom-input">
+              <input
+                id="stars-custom-amount" data-testid="stars-custom-amount"
+                type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" enterKeyHint="done"
+                placeholder={copy.customAmountPlaceholder} value={customAmount} disabled={loading}
+                onFocus={() => { if (!custom) selectCustomAmount(); }}
+                onChange={event => selectCustomAmount(event.target.value)}
+                aria-invalid={customInvalid}
+                aria-describedby={`stars-custom-hint${customInvalid ? " stars-custom-error" : ""}`}
+              />
+              <Star size={18} fill="currentColor" aria-hidden="true" />
+            </div>
+            <p id="stars-custom-hint" className="support-custom-hint">{amountHint}</p>
+            {customInvalid ? <p id="stars-custom-error" className="support-custom-error" role="alert">{amountError}</p> : null}
+          </div>
           {!availability.starsEnabled ? (
             <div className="support-availability" data-testid="stars-disabled-status"><Clock3 size={20} aria-hidden="true" /><div><strong>{copy.starsDisabled}</strong><p>{copy.starsDisabledDescription}</p></div></div>
           ) : (
             <div className="support-availability support-availability-enabled"><ShieldCheck size={20} aria-hidden="true" /><div><strong>{copy.starsReady}</strong><p>{copy.starsNote}</p></div></div>
           )}
-          <button className="support-primary focus-ring" type="button" disabled={!availability.starsEnabled || loading} onClick={createInvoice} aria-describedby="support-invoice-note">
+          <button className="support-primary focus-ring" type="button" disabled={!availability.starsEnabled || loading || amount === null} onClick={createInvoice} aria-describedby="support-invoice-note">
             {loading ? <LoaderCircle className="support-spinner" size={19} aria-hidden="true" /> : <Send size={19} aria-hidden="true" />}
             {loading ? copy.starsLoading : copy.starsButton}
           </button>
+          {amount !== null ? <p className="support-selected-amount" data-testid="stars-selected-amount" aria-live="polite">{copy.selectedAmount.replace("{amount}", String(amount))}</p> : null}
           <div aria-live="polite" aria-atomic="true">
             {invoiceState === "ready" && invoiceUrl ? (
               <div className="support-invoice-ready" data-testid="support-invoice-ready"><p><Check size={18} aria-hidden="true" />{copy.invoiceReady}</p><a className="support-invoice-link focus-ring" href={invoiceUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{copy.invoiceOpen}<ExternalLink size={16} aria-hidden="true" /></a></div>

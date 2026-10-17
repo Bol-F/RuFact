@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getTranslations } from "../lib/i18n.ts";
 import { supportCopy } from "../lib/support-copy.ts";
+import { STARS_AMOUNTS, STARS_MIN_AMOUNT, STARS_MAX_AMOUNT } from "../lib/support.ts";
 
 import { handleSupportStarsRequest } from "../lib/server/support-http.ts";
 import { SupportError } from "../lib/server/support-core.ts";
@@ -40,7 +41,7 @@ test("existing i18n exposes complete non-empty Support translations in all three
 
 test("website invoice endpoint returns only a URL, no success or financial identifiers", async () => {
   for (const locale of ["uz", "ru", "en"]) {
-    for (const amount of [50, 100, 250]) {
+    for (const amount of [...STARS_AMOUNTS, STARS_MIN_AMOUNT, 7, 15, 50, 100, 250, STARS_MAX_AMOUNT]) {
       const deps = dependencies();
       const response = await handleSupportStarsRequest(request({ amount, locale }), deps);
       assert.equal(response.status, 200);
@@ -82,9 +83,13 @@ test("only same-origin JSON POST requests can create invoices", async () => {
 test("malformed amounts, locale, extra payment status, identity and arrays are rejected", async () => {
   for (const body of [
     "{", "", null, [], 50, { amount: 100 }, { locale: "en" },
-    { amount: "50", locale: "en" }, { amount: 100.5, locale: "en" },
+    { amount: "50", locale: "en" }, { amount: "15", locale: "en" }, { amount: 100.5, locale: "en" },
     { amount: -50, locale: "en" }, { amount: 0, locale: "en" },
-    { amount: 500, locale: "en" }, { amount: 100, locale: "unknown" },
+    { amount: STARS_MAX_AMOUNT + 1, locale: "en" }, { amount: Number.MAX_SAFE_INTEGER + 1, locale: "en" },
+    { amount: Infinity, locale: "en" }, { amount: -Infinity, locale: "en" }, { amount: NaN, locale: "en" },
+    { amount: true, locale: "en" }, { amount: {}, locale: "en" }, { amount: [], locale: "en" },
+    '{"amount":1e309,"locale":"en"}', '{"amount":NaN,"locale":"en"}',
+    { amount: 100, locale: "unknown" },
     { amount: 100, locale: "en", paid: true }, { amount: 100, locale: "en", telegramUserId: 42 },
     { amount: 100, locale: "en", currency: "XTR" },
   ]) {

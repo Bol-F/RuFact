@@ -1,4 +1,5 @@
 import type { AppLocale } from "../i18n";
+import { STARS_AMOUNTS, STARS_MIN_AMOUNT, STARS_MAX_AMOUNT, isStarsAmount } from "../support.ts";
 
 export const telegramUi = {
   uz: { check: "🔎 Matnni tekshirish", chat: "💬 AI chat", language: "🌐 Til / Language", help: "❔ Yordam", clear: "🧹 Yangi suhbat", stop: "⏹ Chatni tugatish", stopped: "⏹ Chat tugatildi, kontekst o‘chirildi. Endi matnni tekshirish rejimidasiz. /chat — qayta boshlash.", choose: "🌐 Javob tilini tanlang", checkMode: "🔎 Tekshirish rejimi\n\nMatn yuboring yoki xabarni forward qiling. Men manbalarni topib, da’volarni solishtiraman.", chatMode: "💬 RuFact AI chat\n\nSavol bering, keyin davomiy savollarni yozavering — har safar /chat kerak emas. Faktlarga oid savollarga internet manbalari topiladi.\n\nChat siz /stop yoki /check tanlamaguningizcha faol. Oxirgi 3 savol-javob 30 daqiqa harakatsizlikdan keyin o‘chadi, lekin chat rejimi qoladi. /new — yangi suhbat. Shaxsiy ma’lumot yubormang.", cleared: "🧹 Yangi suhbat boshlandi. Savolingizni yozing — chat faol.", typing: "Savol yoki davomiy savol yozing…", chatTitle: "RuFact · AI yordamchi" },
@@ -11,9 +12,9 @@ export const telegramSupportCopy = {
     button: "❤️ RuFact’ni qo‘llab-quvvatlash",
     title: "❤️ RuFact’ni qo‘llab-quvvatlash",
     description: "RuFact bepul loyiha. Ixtiyoriy yordamingiz xizmat va axborotni tekshirishni rivojlantirishga yordam beradi. To‘lov majburiy emas va qo‘shimcha tekshiruv yoki aniqroq javob bermaydi.",
-    choose: "Bir martalik Telegram Stars miqdorini tanlang: 50, 100 yoki 250 ⭐. /donate 50 kabi yozishingiz ham mumkin.",
+    choose: `Bir martalik Telegram Stars miqdorini tanlang: 5, 10 yoki 25 ⭐. Boshqa miqdor uchun /donate 15 kabi yozing (${STARS_MIN_AMOUNT}–${STARS_MAX_AMOUNT} butun Stars).`,
     disabled: "Telegram Stars orqali yordam hozircha yoqilmagan. Egasi talablar va ishga tayyorlikni tekshirgandan keyin uni yoqishi mumkin.",
-    invalid: "Faqat 50, 100 yoki 250 Stars tanlang: /donate 50, /donate 100 yoki /donate 250.",
+    invalid: `${STARS_MIN_AMOUNT}–${STARS_MAX_AMOUNT} oralig‘ida butun Stars miqdorini kiriting, masalan: /donate 15.`,
     invoice: "Telegram’da bir martalik yordam hisobini ochish",
     pending: "Hali to‘lov tasdiqlanmadi. Faqat Telegram tasdiqlangan to‘lov xabarini yuborgandan keyin rahmat xabari keladi.",
     unavailable: "Hozir hisob yaratib bo‘lmadi. Keyinroq urinib ko‘ring. Bu xabar to‘lov amalga oshganini bildirmaydi.",
@@ -29,9 +30,9 @@ export const telegramSupportCopy = {
     button: "❤️ Поддержать RuFact",
     title: "❤️ Поддержать RuFact",
     description: "RuFact — бесплатный проект. Добровольная поддержка помогает поддерживать сервис и развивать проверку информации. Платить необязательно: поддержка не даёт дополнительных проверок или более точных ответов.",
-    choose: "Выберите разовую поддержку: 50, 100 или 250 ⭐ Telegram Stars. Можно написать /donate 50.",
+    choose: `Выберите разовую поддержку: 5, 10 или 25 ⭐ Telegram Stars. Для своей суммы напишите, например, /donate 15 (целое число от ${STARS_MIN_AMOUNT} до ${STARS_MAX_AMOUNT}).`,
     disabled: "Поддержка через Telegram Stars пока выключена. Владелец сможет включить её после проверки требований и готовности проекта.",
-    invalid: "Доступны только 50, 100 или 250 Stars: /donate 50, /donate 100 или /donate 250.",
+    invalid: `Введите целое число Stars от ${STARS_MIN_AMOUNT} до ${STARS_MAX_AMOUNT}, например: /donate 15.`,
     invoice: "Открыть разовый счёт поддержки в Telegram",
     pending: "Оплата ещё не подтверждена. Благодарность придёт только после подтверждённого Telegram события оплаты.",
     unavailable: "Сейчас не удалось создать счёт. Попробуйте позже. Это сообщение не подтверждает оплату.",
@@ -47,9 +48,9 @@ export const telegramSupportCopy = {
     button: "❤️ Support RuFact",
     title: "❤️ Support RuFact",
     description: "RuFact is a free project. Voluntary support helps maintain the service and improve information checking. Payment is never required and does not unlock more checks or more accurate answers.",
-    choose: "Choose a one-off contribution: 50, 100 or 250 ⭐ Telegram Stars. You can also send /donate 50.",
+    choose: `Choose a one-off contribution: 5, 10 or 25 ⭐ Telegram Stars. For a custom amount, send e.g. /donate 15 (whole Stars from ${STARS_MIN_AMOUNT} to ${STARS_MAX_AMOUNT}).`,
     disabled: "Telegram Stars support is currently disabled. The owner can enable it after checking eligibility and production readiness.",
-    invalid: "Only 50, 100 or 250 Stars are available: /donate 50, /donate 100 or /donate 250.",
+    invalid: `Enter a whole number of Stars from ${STARS_MIN_AMOUNT} to ${STARS_MAX_AMOUNT}, e.g. /donate 15.`,
     invoice: "Open the one-off support invoice in Telegram",
     pending: "Payment is not confirmed yet. A thank-you follows only after Telegram sends a confirmed payment event.",
     unavailable: "An invoice could not be created right now. Please try later. This message does not confirm a payment.",
@@ -73,7 +74,9 @@ export function telegramNotice(text: string) {
 }
 
 export function telegramButtonCommand(text: string) {
-  if (/^(50|100|250) ⭐$/.test(text)) return `/donate ${text.split(" ", 1)[0]}`;
+  const starsButton = /^(\d{1,5}) ⭐$/u.exec(text);
+  // Old persistent keyboards (50/100/250) remain usable after the preset change.
+  if (starsButton && isStarsAmount(Number(starsButton[1]))) return `/donate ${starsButton[1]}`;
   if (Object.values(telegramSupportCopy).some(copy => copy.button === text)) return "/donate";
   const languages: Record<string, string> = { "🇺🇿 O‘zbekcha": "/uz", "🇷🇺 Русский": "/ru", "🇬🇧 English": "/en" };
   if (languages[text]) return languages[text];
@@ -93,7 +96,7 @@ export function telegramKeyboard(locale: AppLocale, webUrl: string, languages = 
   const support = telegramSupportCopy[locale];
   return {
     keyboard: supportOptions ? [
-      [{ text: "50 ⭐" }, { text: "100 ⭐" }, { text: "250 ⭐" }],
+      STARS_AMOUNTS.map(amount => ({ text: `${amount} ⭐` })),
       [{ text: chatMode ? copy.chat : copy.check }, { text: copy.language }],
       [{ text: support.button }, { text: copy.help }],
     ] : languages ? [[{ text: "🇺🇿 O‘zbekcha" }, { text: "🇷🇺 Русский" }, { text: "🇬🇧 English" }], [{ text: chatMode ? copy.chat : copy.check }, { text: copy.help }]] : chatMode ? [

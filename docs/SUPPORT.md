@@ -1,9 +1,12 @@
 # RuFact voluntary support
 
-Implementation date: 16 October 2026. **Not deployed or enabled by this change.**
+Initial implementation: 16 October 2026; custom amount update: 17 October 2026.
+**Payment activation remains server-controlled and unchanged by this update.**
 The `/support` page and existing [@RuFact_bot](https://t.me/RuFact_bot) offer
-optional, one-time **50 / 100 / 250 Telegram Stars** support. Fact-checking and
-AI chat remain free. No subscription, tax-deductibility, accuracy guarantee,
+optional, one-time **5 / 10 / 25 Telegram Stars** support, with **10** selected
+initially and an optional custom whole-number amount from **1 to 10,000 Stars**.
+This range is an application safety cap, not a statement of Telegram's maximum.
+Fact-checking and AI chat remain free. No subscription, tax-deductibility, accuracy guarantee,
 priority service or other paid entitlement is promised.
 
 ## Components and flow
@@ -32,6 +35,15 @@ user immediately. Invoice links can be forwarded; the server therefore enforces
 one payer/query and one payment per intent. Browser return URLs, query parameters,
 button clicks and client-reported payment statuses are never evidence of payment.
 The frontend displays **invoice ready**, never **payment successful**.
+
+On the website, focusing the custom amount field switches away from the preset
+selection. Empty, fractional, signed, exponential, non-numeric and out-of-range
+entries cannot create invoices. Both the API and bot validate the same integer
+range; `/donate 7` requests seven Stars, while `/donate` shows 5 / 10 / 25 choices.
+Changing either the preset or custom amount clears any previous invoice link;
+the user must explicitly create a new invoice. All amount controls are disabled
+while invoice creation is pending. This does not change payment confirmation,
+rate limits, existing payment records or the server-only activation flag.
 
 `createInvoiceLink` uses `currency: "XTR"`, `provider_token: ""`, exactly one
 price and no subscription/tips/shipping fields, as specified by the
@@ -120,8 +132,9 @@ substitute for a reviewed financial backup/reconciliation procedure.
 
 ## Security, retries and failures
 
-- Same-origin JSON-only website boundary, exact amount/locale allowlist, no
-  additional keys, 1024-byte streamed body cap and three-second body-read deadline.
+- Same-origin JSON-only website boundary, bounded integer amount and exact locale
+  validation, no additional keys, 1024-byte streamed body cap and three-second
+  body-read deadline.
 - HMAC IP identity for web and verified Telegram identity for bot. Separate
   sliding invoice limits and shared fixed-window daily budget; no AI quota use.
   Production rate-limit timeouts/Redis errors fail closed.
@@ -266,7 +279,8 @@ npm run build
 npm run test:e2e -- tests/e2e/support.spec.ts
 ```
 
-Tests inject/mock Telegram and payment stores. They cover exact amounts, all
+Tests inject/mock Telegram and payment stores. They cover integer bounds, custom
+amounts, rejected fractions/strings/unsafe integers, preset amounts, all
 locales, strict bodies/origins/unsafe URLs, missing config, provider errors,
 Redis errors, pre-checkout validation/reservation, duplicate/replayed/concurrent
 success, delayed confirmations after disablement, 52-bit ID representation and
@@ -285,6 +299,11 @@ Remove-Item Env:PLAYWRIGHT_PORT
 ```
 
 Do not use the fixture against production or with `PLAYWRIGHT_USE_START=1`.
+The enabled fixture also covers custom entry in all three locales on desktop and
+phone, invalid input without network requests, exact numeric invoice payloads,
+amount controls locked while loading, and stale invoice links cleared after an
+amount change. Every browser invoice POST is mocked; links are never opened.
+
 Regular browser tests force both payment flags off. The fixture is defined only
 in Playwright configuration and cannot be activated through a public request.
 

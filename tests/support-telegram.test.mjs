@@ -5,6 +5,7 @@ import { handleTelegramMessage, handleTelegramPaymentUpdate, parseTelegramPaymen
 import { telegramButtonCommand, telegramKeyboard, telegramSupportCopy } from "../lib/server/telegram-ui.ts";
 import { createSupportService, createTelegramSupportProvider, supportPaymentCopy } from "../lib/server/support-core.ts";
 import { telegramCommandRegistrations } from "../scripts/telegram-commands.mjs";
+import { STARS_AMOUNTS, STARS_MIN_AMOUNT, STARS_MAX_AMOUNT } from "../lib/support.ts";
 
 const incoming = { updateId: 1, chatId: 123, messageId: 42, text: "/donate", language: "uz" };
 const ordinary = { update_id: 1, message: { message_id: 42, chat: { id: 123, type: "private" }, from: { id: 123, is_bot: false }, text: "A claim" } };
@@ -152,10 +153,10 @@ test("donate menu and amounts are localised, keep chat/check mode and use only t
       if (chatMode) { values.set("mode:hashed-123", "chat"); values.set("chat:hashed-123", "preserved context"); }
       await handleTelegramMessage({ ...incoming, text: telegramSupportCopy[locale].button, language: locale }, deps);
       assert.ok(sent[0].text.includes(telegramSupportCopy[locale].choose));
-      for (const [index, amount] of [50, 100, 250].entries()) {
+      for (const [index, amount] of STARS_AMOUNTS.entries()) {
         await handleTelegramMessage({ ...incoming, updateId: index + 2, text: `${amount} ⭐`, language: locale }, deps);
       }
-      assert.deepEqual(invoices, [50, 100, 250].map(amount => ({ amount, locale, telegramUserId: 123 })));
+      assert.deepEqual(invoices, STARS_AMOUNTS.map(amount => ({ amount, locale, telegramUserId: 123 })));
       assert.equal(invoiceLimits.length, 3);
       assert.ok(limits.every(item => !item.internet));
       assert.ok(sent.every(item => item.chatMode === chatMode));
@@ -171,7 +172,7 @@ test("donate menu and amounts are localised, keep chat/check mode and use only t
 
 test("invalid, disabled, unconfigured and rate-limited donation requests never create an invoice", async () => {
   const { deps, invoices, invoiceLimits, sent } = harness();
-  for (const [index, value] of ["0", "51", "-100", "50.0", "50 100", "1e2", "<b>50</b>"].entries()) {
+  for (const [index, value] of ["0", "10001", "-100", "50.0", "50 100", "1e2", "<b>50</b>", "Infinity", "NaN", "9007199254740992"].entries()) {
     await handleTelegramMessage({ ...incoming, updateId: index + 1, text: `/donate ${value}` }, deps);
   }
   assert.equal(invoiceLimits.length, 0);
@@ -186,6 +187,21 @@ test("invalid, disabled, unconfigured and rate-limited donation requests never c
   deps.support = undefined;
   await handleTelegramMessage({ ...incoming, updateId: 23, text: "/donate 50" }, deps);
   assert.equal(invoices.length, 0);
+});
+
+test("Telegram custom donation commands accept whole Stars within the application range in each language", async () => {
+  const amounts = [STARS_MIN_AMOUNT, 7, 15, 50, 100, 250, STARS_MAX_AMOUNT];
+  for (const locale of ["uz", "ru", "en"]) {
+    const { deps, invoices, invoiceLimits, sent } = harness();
+    for (const [index, amount] of amounts.entries()) {
+      await handleTelegramMessage({ ...incoming, updateId: index + 1, text: `/donate ${amount}`, language: locale }, deps);
+      assert.ok(sent.at(-1).text.includes(`${amount} ⭐`));
+    }
+    assert.deepEqual(invoices, amounts.map(amount => ({ amount, locale, telegramUserId: 123 })));
+    assert.equal(invoiceLimits.length, amounts.length);
+    assert.ok(telegramSupportCopy[locale].choose.includes("/donate 15"));
+    assert.ok(telegramSupportCopy[locale].invalid.includes(String(STARS_MAX_AMOUNT)));
+  }
 });
 
 test("invoice delivery retries reuse the cached URL and duplicate updates create no second invoice", async () => {
@@ -232,13 +248,18 @@ test("keyboard support navigation preserves existing controls and registers corr
       const keyboard = telegramKeyboard(locale, "https://rufact.vercel.app", false, chatMode);
       assert.ok(keyboard.keyboard.flat().some(button => button.text === telegramSupportCopy[locale].button));
       const amounts = telegramKeyboard(locale, "https://rufact.vercel.app", false, chatMode, true);
-      assert.deepEqual(amounts.keyboard[0].map(button => telegramButtonCommand(button.text)), ["/donate 50", "/donate 100", "/donate 250"]);
+      assert.deepEqual(amounts.keyboard[0].map(button => telegramButtonCommand(button.text)), ["/donate 5", "/donate 10", "/donate 25"]);
     }
   }
   const setup = await readFile(new URL("../scripts/setup-telegram.mjs", import.meta.url), "utf8");
   assert.match(setup, /allowed_updates: \["message", "pre_checkout_query"\]/u);
   assert.match(setup, /await call\("setMyCommands", registration\)/u);
   assert.doesNotMatch(setup, /allowed_updates: \[[^\]]*"successful_payment"/u);
+});
+
+test("old persistent Stars buttons still map to supported commands without advertising old presets", () => {
+  for (const amount of [5, 10, 25, 50, 100, 250]) assert.equal(telegramButtonCommand(`${amount} ⭐`), `/donate ${amount}`);
+  for (const text of ["0 ⭐", "10001 ⭐", "-1 ⭐", "1.5 ⭐", "1e2 ⭐"]) assert.equal(telegramButtonCommand(text), text);
 });
 
 test("Telegram registers full Uzbek, Russian and English menus with an Uzbek default", () => {

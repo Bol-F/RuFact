@@ -8,6 +8,7 @@ import { claimCopy } from "../claim-copy.ts";
 import { deriveClaimLabel, resolveClaimEvidence, safeSourceHref } from "../claim-evidence.ts";
 import type { GeminiClaim } from "../gemini-review";
 import { arithmeticCopy, arithmeticExplanation, evaluateArithmeticClaim, type ArithmeticClaimResult } from "../arithmetic.ts";
+import { isStarsAmount } from "../support.ts";
 
 export interface TelegramMessage {
   updateId: number;
@@ -295,14 +296,16 @@ async function donationReply(message: TelegramMessage, locale: AppLocale, argume
   const intro = `<b>${escapeTelegramHtml(copy.title)}</b>\n\n${escapeTelegramHtml(copy.description)}`;
   if (!deps.support?.starsEnabled) return `${intro}\n\n${escapeTelegramHtml(copy.disabled)}`;
   if (!argument) return `${intro}\n\n${escapeTelegramHtml(copy.choose)}\n\n/terms · /paysupport`;
-  if (!/^(50|100|250)$/.test(argument.trim())) return `${intro}\n\n${escapeTelegramHtml(copy.invalid)}`;
+  const text = argument.trim();
+  const amount = Number(text);
+  if (!/^\d{1,5}$/u.test(text) || !isStarsAmount(amount)) return `${intro}\n\n${escapeTelegramHtml(copy.invalid)}`;
   try {
     const limit = await deps.support.limit(identifier);
     if (!limit.configured || !limit.allowed) return `${intro}\n\n${escapeTelegramHtml(limit.configured ? botCopy[locale].limited : copy.unavailable)}`;
-    const { url: invoiceUrl } = await deps.support.createInvoice({ amount: Number(argument.trim()), locale, telegramUserId: message.chatId });
+    const { url: invoiceUrl } = await deps.support.createInvoice({ amount, locale, telegramUserId: message.chatId });
     const url = new URL(invoiceUrl);
     if (url.protocol !== "https:" || url.hostname !== "t.me" || !url.pathname.startsWith("/$") || url.username || url.password || url.port || url.hash || url.search) throw new Error("Invalid invoice URL");
-    return `${intro}\n\n<a href="${escapeTelegramHtml(url.href)}">${escapeTelegramHtml(copy.invoice)} · ${Number(argument.trim())} ⭐</a>\n\n${escapeTelegramHtml(copy.pending)}\n\n/terms · /paysupport`;
+    return `${intro}\n\n<a href="${escapeTelegramHtml(url.href)}">${escapeTelegramHtml(copy.invoice)} · ${amount} ⭐</a>\n\n${escapeTelegramHtml(copy.pending)}\n\n/terms · /paysupport`;
   } catch {
     // Payment/transport errors may contain a token-bearing URL. Never echo them.
     return `${intro}\n\n${escapeTelegramHtml(copy.unavailable)}`;

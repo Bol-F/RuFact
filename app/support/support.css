@@ -20,6 +20,20 @@
 .support-amount input:checked + span { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--surface)); color: var(--orange); box-shadow: inset 0 0 0 .5px var(--orange); }
 .support-amount input:focus-visible + span { outline: 3px solid #7d9fbf; outline-offset: 3px; }
 .support-amounts:disabled .support-amount { cursor: wait; opacity: .7; }
+.support-custom-amount { margin-top: 18px; }
+.support-custom-amount > label { display: block; margin-bottom: 8px; color: var(--ink); font-size: .8125rem; font-weight: 650; line-height: 1.5; }
+.support-custom-input { position: relative; }
+.support-custom-input input { display: block; width: 100%; min-height: 51px; padding: 12px 44px 12px 15px; border: 1px solid #d1d9e1; border-radius: 9px; background: #fbfcfd; color: var(--ink); font: inherit; font-size: 1rem; font-variant-numeric: tabular-nums; outline-offset: 3px; transition: border-color 150ms, background 150ms; }
+.support-custom-input input::placeholder { color: var(--muted); opacity: .8; }
+.support-custom-input > svg { position: absolute; top: 50%; right: 15px; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
+.support-custom-amount[data-active="true"] input { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 4%, var(--surface)); }
+.support-custom-amount[data-active="true"] .support-custom-input > svg { color: var(--orange); }
+.support-custom-input input:focus-visible { outline: 3px solid #7d9fbf; }
+.support-custom-input input[aria-invalid="true"] { border-color: #a74332; }
+.support-custom-input input:disabled { opacity: .7; cursor: wait; }
+.support-custom-hint, .support-custom-error { margin-top: 7px; color: var(--muted); font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.support-custom-error { color: #923e2f; }
+.support-selected-amount { margin-top: 8px; color: var(--muted); text-align: center; font-size: .75rem; font-variant-numeric: tabular-nums; line-height: 1.5; }
 .support-availability { display: flex; align-items: flex-start; gap: 12px; margin-top: 15px; padding: 15px; border-radius: 11px; background: #f0f4f7; color: #586e83; }
 .support-availability > svg { flex-shrink: 0; margin-top: 2px; }
 .support-availability strong { display: block; font-size: .8125rem; font-weight: 750; line-height: 1.5; }

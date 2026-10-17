@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { STARS_AMOUNTS, isStarsAmount } from "../lib/support.ts";
+import { STARS_AMOUNTS, STARS_MIN_AMOUNT, STARS_MAX_AMOUNT, isStarsAmount } from "../lib/support.ts";
 import {
   createSupportService, createTelegramSupportProvider, safeSupportContactUrl, supportAvailabilityFromEnvironment,
   supportReference, supportBotId, supportPaymentCopy, SUPPORT_PAYLOAD_PREFIX, SUPPORT_PENDING_USABLE_MS,
@@ -92,10 +92,69 @@ async function approvedHarness(locale = "en") {
   return h;
 }
 
-test("Stars accepts only the three exact numeric one-time amounts", () => {
-  assert.deepEqual(STARS_AMOUNTS, [50, 100, 250]);
-  for (const amount of STARS_AMOUNTS) assert.equal(isStarsAmount(amount), true);
-  for (const bad of [0, -50, 49, 50.5, 500, "50", true, null, undefined, Infinity, NaN]) assert.equal(isStarsAmount(bad), false);
+test("Stars presets are 5/10/25 and custom amounts require bounded safe integer numbers", () => {
+  assert.deepEqual(STARS_AMOUNTS, [5, 10, 25]);
+  assert.equal(STARS_MIN_AMOUNT, 1);
+  assert.equal(STARS_MAX_AMOUNT, 10_000);
+  for (const amount of [...STARS_AMOUNTS, STARS_MIN_AMOUNT, 7, 49, 50, 100, 250, 500, STARS_MAX_AMOUNT]) {
+    assert.equal(isStarsAmount(amount), true, String(amount));
+  }
+  for (const bad of [0, -0, -1, -50, 1.1, 50.5, STARS_MAX_AMOUNT + 1, Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER + 1, "5", "15", "1e2", "", true, false, null, undefined, Infinity, -Infinity, NaN, {}, [], 1n]) {
+    assert.equal(isStarsAmount(bad), false, String(bad));
+  }
+});
+
+test("custom amounts and existing 50/100/250 invoices preserve exact amount binding and idempotent receipts", async () => {
+  for (const amount of [STARS_MIN_AMOUNT, 7, 15, 50, 100, 250, STARS_MAX_AMOUNT]) {
+    const h = harness();
+    const service = h.service();
+    await service.createStarsInvoice({ amount, locale: "en", telegramUserId: 123 });
+    assert.equal(h.invoices[0].amount, amount);
+    assert.equal(h.records.get(ref).amount, amount);
+    const event = { ...checkout, totalAmount: amount };
+    const wrongAmount = amount === STARS_MAX_AMOUNT ? amount - 1 : amount + 1;
+    await service.handleStarsPreCheckout({ ...event, totalAmount: wrongAmount });
+    assert.equal(h.answers.at(-1).approved, false);
+    assert.equal(h.records.get(ref).status, "pending");
+    await service.handleStarsPreCheckout(event);
+    await service.handleStarsPreCheckout(event);
+    assert.equal(h.answers.at(-1).approved, true);
+    const paid = { ...payment, totalAmount: amount };
+    await assert.rejects(service.handleStarsSuccessfulPayment({ ...paid, totalAmount: wrongAmount }), error => error.code === "invalid-payment");
+    assert.equal(h.charges.size, 0);
+    assert.equal(h.thanks.length, 0);
+    await service.handleStarsSuccessfulPayment(paid);
+    await service.handleStarsSuccessfulPayment(paid);
+    assert.equal(h.records.get(ref).status, "paid");
+    assert.equal(h.records.get(ref).amount, amount);
+    assert.equal(h.charges.size, 1);
+    assert.equal(h.thanks.length, 1);
+    assert.equal(h.thanks[0].text, supportPaymentCopy.en.thanks(amount));
+  }
+});
+
+test("invalid custom amounts cannot create a pending record or contact the invoice provider", async () => {
+  for (const amount of [0, -1, 0.5, 15.5, STARS_MAX_AMOUNT + 1, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, -Infinity, "15", null, true]) {
+    const h = harness();
+    await assert.rejects(h.service().createStarsInvoice({ amount, locale: "en" }), error => error.code === "invalid-input");
+    assert.deepEqual(h.calls, []);
+    assert.equal(h.records.size, 0);
+    assert.equal(h.invoices.length, 0);
+  }
+});
+
+test("invalid custom payment amounts cannot reach ledger transitions or send a thank-you", async () => {
+  for (const totalAmount of [0, -1, 15.5, STARS_MAX_AMOUNT + 1, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, "15", null]) {
+    const h = harness();
+    await h.service().handleStarsPreCheckout({ ...checkout, totalAmount });
+    assert.deepEqual(h.calls, ["answer"]);
+    assert.equal(h.answers[0].approved, false);
+    await assert.rejects(h.service().handleStarsSuccessfulPayment({ ...payment, totalAmount }), error => error.code === "invalid-payment");
+    assert.deepEqual(h.calls, ["answer"]);
+    assert.equal(h.charges.size, 0);
+    assert.equal(h.thanks.length, 0);
+  }
 });
 
 test("payments are disabled by default, missing config fails closed, and Wallet cannot be activated by its flag", () => {

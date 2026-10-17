@@ -43,13 +43,14 @@ for (const locale of ["uz", "ru", "en"] as const) {
     await expect(page.getByTestId("support-wallet").getByRole("button")).toHaveCount(0);
     await expect(page.getByTestId("support-wallet").getByRole("link")).toHaveCount(0);
     await expect(page.getByRole("radio")).toHaveCount(3);
-    const selected = page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "100"), exact: true });
+    const selected = page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "10"), exact: true });
     await expect(selected).toBeChecked();
     await selected.focus();
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "250"), exact: true })).toBeChecked();
+    await expect(page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "25"), exact: true })).toBeChecked();
     await page.keyboard.press("ArrowLeft");
     await expect(selected).toBeChecked();
+    await expect(page.getByTestId("stars-custom-amount")).toBeVisible();
     expect(invoices).toEqual([]);
 
     for (const width of [320, 390, 1280, 1440]) {
@@ -128,10 +129,12 @@ for (const locale of ["uz", "ru", "en"] as const) {
     const copy = supportCopy[locale];
     await expect(page.getByTestId("support-stars")).toHaveAttribute("data-enabled", "true");
     expect(requests).toEqual([]);
-    await page.locator(".support-amount").filter({ has: page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "50"), exact: true }) }).click();
-    await expect(page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "50"), exact: true })).toBeChecked();
+    await page.locator(".support-amount").filter({ has: page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "5"), exact: true }) }).click();
+    await expect(page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "5"), exact: true })).toBeChecked();
     await page.getByRole("button", { name: copy.starsButton, exact: true }).click();
     await expect(page.getByRole("button", { name: copy.starsLoading, exact: true })).toBeDisabled();
+    await expect(page.getByTestId("stars-custom-amount")).toBeDisabled();
+    for (const radio of await page.getByRole("radio").all()) await expect(radio).toBeDisabled();
     release();
     await expect(page.getByTestId("support-invoice-ready")).toContainText(copy.invoiceReady);
     const invoice = page.getByRole("link", { name: copy.invoiceOpen, exact: true });
@@ -139,10 +142,91 @@ for (const locale of ["uz", "ru", "en"] as const) {
     await expect(invoice).toHaveAttribute("rel", "noopener noreferrer");
     await expect(page.locator("#support-invoice-note")).toHaveText(copy.invoiceNotPaid);
     await expect(page).toHaveURL(/\/support$/);
-    expect(requests).toEqual([{ amount: 50, locale }]);
+    expect(requests).toEqual([{ amount: 5, locale }]);
     expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain("support_test_invoice");
-    await page.locator(".support-amount").filter({ has: page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "250"), exact: true }) }).click();
+    await page.locator(".support-amount").filter({ has: page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "25"), exact: true }) }).click();
     await expect(page.getByTestId("support-invoice-ready")).toHaveCount(0);
+    await healthy(page, errors);
+  });
+}
+
+for (const locale of ["uz", "ru", "en"] as const) {
+  test(`custom Stars amounts are validated without payments and replace stale invoices in ${locale}`, async ({ page }) => {
+    test.skip(!enabledFixture, "Run with SUPPORT_STARS_E2E=1 and isolated fake server configuration");
+    const errors = collectErrors(page);
+    const requests: unknown[] = [];
+    await page.route("**/api/support/stars", async route => {
+      requests.push(route.request().postDataJSON());
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ url: fakeInvoiceUrl }) });
+    });
+    await page.goto("/support");
+    await changeLanguage(page, locale);
+    const copy = supportCopy[locale];
+    const stars = page.getByTestId("support-stars");
+    const custom = page.getByTestId("stars-custom-amount");
+    const submit = page.getByRole("button", { name: copy.starsButton, exact: true });
+    await expect(page).toHaveURL(/\/support$/);
+    await expect(page).toHaveTitle(/RuFact/);
+    await expect(page.getByRole("heading", { name: copy.title, level: 1 })).toBeVisible();
+    await page.screenshot({ path: join(tmpdir(), `rufact-support-custom-first-${locale}-${test.info().project.name}.png`), fullPage: false, scale: "css" });
+    await expect(custom).toHaveAccessibleName(copy.customAmount);
+    await expect(custom).toHaveAttribute("type", "text");
+    await expect(custom).toHaveAttribute("inputmode", "numeric");
+    await expect(page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "10"), exact: true })).toBeChecked();
+
+    // Focusing the input explicitly chooses custom mode, even if its number
+    // matches a preset. Invalid strings must never cause a network request.
+    await custom.focus();
+    for (const radio of await page.getByRole("radio").all()) await expect(radio).not.toBeChecked();
+    await expect(submit).toBeDisabled();
+    await expect(custom).toHaveAttribute("aria-invalid", "false");
+    await expect(stars.getByRole("alert")).toHaveCount(0);
+    for (const value of ["0", "-1", "2.5", "1e2", "1,000", " 5 ", "10001", "9".repeat(80), `${"0".repeat(31)}5.5`, "abc"]) {
+      await custom.fill(value);
+      await expect(custom).toHaveValue(value);
+      await expect(custom).toHaveAttribute("aria-invalid", "true");
+      await expect(submit).toBeDisabled();
+      await expect(stars.getByRole("alert")).toContainText(/\S/u);
+      expect(requests).toEqual([]);
+    }
+    await custom.fill("");
+    await expect(submit).toBeDisabled();
+    await expect(custom).toHaveAttribute("aria-invalid", "false");
+    await expect(stars.getByRole("alert")).toHaveCount(0);
+
+    for (const amount of [1, 10000, 17]) {
+      await custom.fill(String(amount));
+      await expect(custom).toHaveAttribute("aria-invalid", "false");
+      await expect(stars.getByRole("alert")).toHaveCount(0);
+      await expect(page.getByTestId("support-invoice-ready")).toHaveCount(0);
+      await expect(submit).toBeEnabled();
+      await submit.click();
+      await expect(page.getByTestId("support-invoice-ready")).toContainText(copy.invoiceReady);
+      await expect(page.getByRole("link", { name: copy.invoiceOpen, exact: true })).toHaveAttribute("href", fakeInvoiceUrl);
+      expect(requests.at(-1)).toEqual({ amount, locale });
+    }
+
+    await page.screenshot({ path: join(tmpdir(), `rufact-support-custom-${locale}-${test.info().project.name}.png`), fullPage: true, scale: "css" });
+    if (locale === "en") {
+      const viewport = test.info().project.name.startsWith("mobile") ? "mobile" : "desktop";
+      await stars.screenshot({ path: join(tmpdir(), `rufact-support-custom-card-${viewport}.png`), scale: "css" });
+    }
+    await custom.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(tmpdir(), `rufact-support-custom-field-${locale}-${test.info().project.name}.png`), fullPage: false, scale: "css" });
+    const preset = page.getByRole("radio", { name: copy.amountAria.replace("{amount}", "25"), exact: true });
+    await page.locator(".support-amount").filter({ has: preset }).click();
+    await expect(preset).toBeChecked();
+    await expect(page.getByTestId("support-invoice-ready")).toHaveCount(0);
+    await submit.click();
+    await expect(page.getByTestId("support-invoice-ready")).toBeVisible();
+    expect(requests.at(-1)).toEqual({ amount: 25, locale });
+
+    await custom.fill("5");
+    await expect(page.getByTestId("support-invoice-ready")).toHaveCount(0);
+    for (const radio of await page.getByRole("radio").all()) await expect(radio).not.toBeChecked();
+    await expect(submit).toBeEnabled();
+    expect(requests).toEqual([{ amount: 1, locale }, { amount: 10000, locale }, { amount: 17, locale }, { amount: 25, locale }]);
+    expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain("support_test_invoice");
     await healthy(page, errors);
   });
 }
