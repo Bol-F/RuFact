@@ -152,10 +152,11 @@ test("desktop analysis workflow and guidance", async ({ page }, testInfo) => {
     page.getByRole("heading", { name: /Проверьте текст/u }),
   ).toBeVisible();
   await expect(page.getByLabel("Текст для анализа")).toBeVisible();
-  await expect(page.getByRole("switch", { name: /Проверка по интернет-источникам/u })).toBeVisible();
+  await expect(page.locator("#use-gemini")).toHaveCount(0);
+  await expect(page.getByTestId("analyzer-source-notice")).toBeVisible();
   await expect(page.getByText("Бета-версия", { exact: true })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Новость", exact: true }).click();
+  await page.getByLabel("Текст для анализа").fill("По данным Росстата, новый городской парк открылся после реконструкции.");
   await expect(page.getByLabel("Текст для анализа")).toHaveValue(
     /Росстата/u,
   );
@@ -194,7 +195,7 @@ test("result actions and feedback dialog work", async ({ page, context }, testIn
 
   await page.goto("/");
   await selectRussian(page);
-  await page.getByRole("button", { name: "Новость", exact: true }).click();
+  await page.locator("#analysis-text").fill("Городской парк открылся после реконструкции.");
   await page.locator(".analyzer-submit").click();
   const actions = page.getByRole("region", { name: "Действия с результатом" });
   await expect(actions).toBeVisible();
@@ -316,10 +317,9 @@ test("optional live Gemini review renders validated claims", async ({ page }, te
 
   await page.goto("/");
   await selectRussian(page);
-  const geminiSwitch = page.getByRole("switch", { name: /Проверка по интернет-источникам/u });
-  await expect(geminiSwitch).toBeEnabled();
-  await geminiSwitch.check();
-  await page.getByRole("button", { name: "Новость", exact: true }).click();
+  await expect(page.locator("#use-gemini")).toHaveCount(0);
+  await expect(page.getByTestId("analyzer-source-notice")).toContainText("Tavily");
+  await page.locator("#analysis-text").fill("Ташкент — столица Узбекистана.");
   await page.getByRole("button", { name: /Проверить текст/u }).click();
 
   await expect(

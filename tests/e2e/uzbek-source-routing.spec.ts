@@ -295,21 +295,12 @@ test("Uzbek source-only replies render usable links, no ML score, and no runtime
     await expect(page.locator(".analysis-result")).toBeVisible();
     await expect(page.locator("nextjs-portal [role=dialog]")).toHaveCount(0);
     await changeLanguage(page, locale);
-    const sourceSwitch = page.locator("#use-gemini");
-    const sourceConfigurationAvailable = await sourceSwitch.isEnabled();
-    if (sourceConfigurationAvailable) {
-      // Remember a real opt-out for supported English/Russian content. Uzbek must
-      // temporarily force sources without resetting that preference for other text.
-      await page.locator("#analysis-text").fill("A new public park opened in London today.");
-      await sourceSwitch.uncheck();
-      await expect(sourceSwitch).not.toBeChecked();
-    }
+    await expect(page.locator("#use-gemini")).toHaveCount(0);
+    await expect(page.locator("#gemini-option-heading, #uzbek-routing-note")).toHaveCount(0);
+    await expect(page.getByTestId("analyzer-source-notice")).toBeVisible();
     for (const text of [LATIN_TEXT, CYRILLIC_TEXT]) {
       await page.locator("#analysis-text").fill(text);
-      await expect(page.locator('[data-uzbek-routing="source-only"]')).toContainText("Tavily");
-      await expect(sourceSwitch).toBeDisabled();
-      if (sourceConfigurationAvailable) await expect(sourceSwitch).toBeChecked();
-      else await expect(sourceSwitch).not.toBeChecked();
+      await expect(page.locator("#use-gemini, #uzbek-routing-note")).toHaveCount(0);
       await page.locator(".analyzer-submit").click();
       const verdict = page.locator('[data-verdict-basis="sources"]');
       await expect(verdict).toHaveAttribute("data-verdict-label", "REAL");
@@ -320,12 +311,6 @@ test("Uzbek source-only replies render usable links, no ML score, and no runtime
       await expect(source).toBeVisible();
       await expect(source).toHaveAttribute("target", "_blank");
       expect(analyzeInputs.at(-1)).toEqual({ text, locale, useGemini: true });
-    }
-    if (sourceConfigurationAvailable) {
-      await page.locator("#analysis-text").fill("A new public park opened in London today.");
-      await expect(sourceSwitch).toBeEnabled();
-      await expect(sourceSwitch).not.toBeChecked();
-      await page.locator("#analysis-text").fill(CYRILLIC_TEXT);
     }
     expect(providers.mlCalls()).toBe(0);
     expect(providers.calls.map(call => call.kind)).toEqual(["tavily", "gemini", "tavily", "gemini"]);

@@ -153,7 +153,7 @@ test("Uzbek teal and English navy-copper colors apply to the shared hero and con
   await expect(page.locator("header .brand > span:first-child > span:last-child")).toHaveCSS("background-color", "rgb(226, 122, 66)");
   await expect(page.locator(".header-feedback")).toHaveCSS("background-color", "rgb(10, 41, 73)");
   await expect(page.locator(".analyzer-submit")).not.toHaveCSS("background-image", "none");
-  await page.getByRole("button", { name: "Новость", exact: true }).click();
+  await page.locator("#analysis-text").fill("Городской парк открылся после реконструкции.");
   await page.locator(".analyzer-submit").click();
   await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"]')).toBeVisible();
   await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"] p').first()).toHaveCSS("color", "rgb(199, 53, 60)");

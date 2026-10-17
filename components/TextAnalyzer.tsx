@@ -10,16 +10,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { DOCUMENT_ACCEPT } from "@/lib/document-upload";
-import { detectTextLanguage } from "@/lib/text-language";
-import { ExampleChips, type TextExample } from "./ExampleChips";
 import { HistoryTrigger } from "./HistoryTrigger";
 import { useLanguage } from "./LanguageProvider";
 
 interface TextAnalyzerProps {
   text: string;
   canClear: boolean;
-  examples: readonly TextExample[];
-  activeExampleId: string | null;
   isLoading: boolean;
   isExtracting: boolean;
   validationMessage: string | null;
@@ -28,37 +24,17 @@ interface TextAnalyzerProps {
   historyEnabled: boolean;
   historyCount: number;
   geminiConfigured: boolean;
-  useGemini: boolean;
   onTextChange: (value: string) => void;
   onDocumentSelect: (file: File) => void;
   onClear: () => void;
-  onExampleSelect: (example: TextExample) => void;
   onSubmit: () => void;
   onOpenHistory: () => void;
-  onUseGeminiChange: (enabled: boolean) => void;
 }
 
 const MAX_LENGTH = 5000;
-const uzbekRoutingCopy = {
-  uz: {
-    on: "O‘zbekcha matn har doim bevosita Tavily → Gemini orqali tekshiriladi. Rus yoki ingliz ML modeli ishlatilmaydi.",
-    unavailable: "O‘zbekcha tekshiruv uchun serverda Tavily va Gemini sozlangan bo‘lishi kerak. Statistik ML modeli talab qilinmaydi.",
-  },
-  ru: {
-    on: "Узбекский текст всегда проверяется напрямую через Tavily → Gemini, без русской или английской ML-модели.",
-    unavailable: "Для узбекской проверки нужны настроенные на сервере Tavily и Gemini. Статистическая ML-модель не требуется.",
-  },
-  en: {
-    on: "Uzbek text is always checked directly through Tavily → Gemini, without the Russian or English ML models.",
-    unavailable: "Uzbek checks need Tavily and Gemini configured on the server. A statistical ML model is not required.",
-  },
-} as const;
-
 export function TextAnalyzer({
   text,
   canClear,
-  examples,
-  activeExampleId,
   isLoading,
   isExtracting,
   validationMessage,
@@ -67,19 +43,14 @@ export function TextAnalyzer({
   historyEnabled,
   historyCount,
   geminiConfigured,
-  useGemini,
   onTextChange,
   onDocumentSelect,
   onClear,
-  onExampleSelect,
   onSubmit,
   onOpenHistory,
-  onUseGeminiChange,
 }: TextAnalyzerProps) {
   const isBusy = isLoading || isExtracting;
-  const { locale, copy } = useLanguage();
-  const isUzbekText = detectTextLanguage(text) === "uz";
-  const effectiveUseGemini = isUzbekText || useGemini;
+  const { copy } = useLanguage();
 
   return (
     <article
@@ -124,7 +95,7 @@ export function TextAnalyzer({
           value={text}
           maxLength={MAX_LENGTH}
           disabled={isBusy}
-          aria-describedby="text-counter text-helper"
+          aria-describedby="text-counter text-helper analyzer-source-notice"
           aria-invalid={Boolean(validationMessage)}
           aria-errormessage={validationMessage ? "text-validation" : undefined}
           onChange={(event) => onTextChange(event.target.value)}
@@ -202,95 +173,6 @@ export function TextAnalyzer({
         ) : null}
       </div>
 
-      <ExampleChips
-        examples={examples}
-        activeId={activeExampleId}
-        disabled={isBusy}
-        onSelect={onExampleSelect}
-      />
-
-      <section
-        aria-labelledby="gemini-option-heading"
-        className="mt-3 rounded-[11px] border border-[#cfdae6] bg-[#eef4f8]/75 px-3 py-2.5 sm:mt-4 sm:rounded-[13px] sm:px-3.5"
-      >
-        <label
-          htmlFor="use-gemini"
-          className={`flex items-start gap-2.5 sm:gap-3 ${
-            geminiConfigured && !isUzbekText ? "cursor-pointer" : "cursor-not-allowed"
-          }`}
-        >
-          <input
-            id="use-gemini"
-            type="checkbox"
-            role="switch"
-            checked={geminiConfigured && effectiveUseGemini}
-            disabled={isBusy || !geminiConfigured || isUzbekText}
-            aria-describedby={`gemini-option-description gemini-privacy-note${isUzbekText ? " uzbek-routing-note" : ""}`}
-            onChange={(event) => onUseGeminiChange(event.target.checked)}
-            className="focus-ring mt-0.5 h-4 w-4 shrink-0 accent-[#285b87] disabled:cursor-not-allowed"
-          />
-          <span className="min-w-0">
-            <span className="flex flex-wrap items-center gap-2">
-              <span
-                id="gemini-option-heading"
-                className="text-[0.71875rem] font-extrabold text-[#163957] sm:text-[0.78125rem]"
-              >
-                {copy.analyzer.internetTitle}
-              </span>
-              <span className="rounded bg-[#d9e6f1] px-1.5 py-0.5 text-[0.5rem] font-extrabold uppercase tracking-[0.08em] text-[#496b88]">
-                Tavily + Gemini
-              </span>
-            </span>
-            <span
-              id="gemini-option-description"
-              className="mt-0.5 block text-[0.59375rem] leading-[1.4] text-[#60768a] sm:text-[0.65625rem] sm:leading-[1.45]"
-            >
-              <span className="sm:hidden">
-                {geminiConfigured
-                  ? effectiveUseGemini
-                    ? copy.analyzer.internetOn
-                    : copy.analyzer.internetOff
-                  : copy.analyzer.internetUnavailable}
-              </span>
-              <span className="hidden sm:inline">
-                {geminiConfigured
-                  ? effectiveUseGemini
-                    ? copy.analyzer.internetOn
-                    : copy.analyzer.internetOff
-                  : copy.analyzer.internetUnavailable}
-              </span>
-            </span>
-          </span>
-        </label>
-        <p
-          id="gemini-privacy-note"
-          className="mt-1.5 pl-6.5 text-[0.53125rem] leading-[1.35] text-[#718092] sm:pl-7 sm:text-[0.59375rem] sm:leading-[1.45]"
-        >
-          {geminiConfigured ? (
-            <>
-              <span className="sm:hidden">{copy.analyzer.privacyShort} </span>
-              <span className="hidden sm:inline">{copy.analyzer.privacyLong} </span>
-              <a
-                href="https://ai.google.dev/gemini-api/terms"
-                target="_blank"
-                rel="noreferrer"
-                className="focus-ring rounded-sm font-bold text-[#315f87] underline decoration-[#8aa5bd] underline-offset-2"
-              >
-                {copy.analyzer.terms}
-              </a>
-            </>
-          ) : (
-            copy.analyzer.internetUnavailable
-          )}
-        </p>
-      </section>
-
-      {isUzbekText || locale !== "ru" ? (
-        <p id="uzbek-routing-note" data-uzbek-routing={isUzbekText ? "source-only" : undefined} className="mt-2 rounded-[10px] border border-[#ead8b7] bg-[#fff8e9] px-3 py-2 text-[0.5625rem] leading-[1.4] text-[#7d6236] sm:text-[0.65625rem]">
-          {isUzbekText ? uzbekRoutingCopy[locale][geminiConfigured ? "on" : "unavailable"] : copy.analyzer.languageNotice}
-        </p>
-      ) : null}
-
       <div className="mt-4 flex flex-col items-stretch gap-2 sm:mt-6 sm:flex-row sm:items-center sm:gap-7">
         <motion.button
           type="button"
@@ -298,6 +180,7 @@ export function TextAnalyzer({
           whileTap={isBusy ? undefined : { scale: 0.99 }}
           disabled={isBusy}
           onClick={onSubmit}
+          aria-describedby="analyzer-source-notice"
           className="analyzer-submit focus-ring group inline-flex min-h-12 flex-1 items-center justify-center gap-3 rounded-[12px] bg-[linear-gradient(100deg,#0b2a4a,#244f78)] px-5 text-[0.875rem] font-bold text-white shadow-[0_10px_20px_rgba(13,47,79,0.15)] disabled:cursor-wait disabled:opacity-85 sm:min-h-[58px] sm:max-w-[345px] sm:gap-4 sm:rounded-[14px] sm:px-7 sm:text-[1rem]"
         >
           {isLoading ? (
@@ -323,6 +206,14 @@ export function TextAnalyzer({
           <span className="hidden sm:inline"><br />{copy.analyzer.helperDesktop}</span>
         </p>
       </div>
+      <p id="analyzer-source-notice" data-testid="analyzer-source-notice" className="mt-3 text-[0.6875rem] leading-[1.45] text-[#718092] sm:text-[0.75rem]">
+        {geminiConfigured ? (
+          <>
+            {copy.analyzer.sourcePrivacy} {copy.analyzer.privacyShort}{" "}
+            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noreferrer" className="focus-ring rounded-sm font-semibold underline underline-offset-2">{copy.analyzer.terms}</a>
+          </>
+        ) : copy.analyzer.internetUnavailable}
+      </p>
     </article>
   );
 }

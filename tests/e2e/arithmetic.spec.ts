@@ -93,8 +93,8 @@ test("decimal arithmetic stays exact even when internet providers are disabled",
   await page.context().setExtraHTTPHeaders({ "x-vercel-forwarded-for": `2001:db8:${process.pid.toString(16)}:de:${testInfo.project.name.startsWith("mobile") ? "2" : "1"}::1` });
   await page.goto("/");
   await changeLanguage(page, "en");
-  await expect(page.locator("#use-gemini")).toBeDisabled();
-  await expect(page.locator("#use-gemini")).not.toBeChecked();
+  await expect(page.locator("#use-gemini")).toHaveCount(0);
+  await expect(page.getByTestId("analyzer-source-notice")).toBeVisible();
   const result = await submitEquation(page, "en", "0.1+0.2=0.3", true);
   expect(result.calculation).toMatchObject({ leftValue: "0.3", rightValue: "0.3", correct: true });
   await expect(page.getByTestId("calculation-reason")).toContainText("Both sides evaluate to 0.3");

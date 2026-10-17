@@ -9,7 +9,6 @@ import { localeTags, type AppLocale } from "@/lib/i18n";
 import { detectTextLanguage } from "@/lib/text-language";
 import { AnalysisHistoryDialog } from "./AnalysisHistoryDialog";
 import { AnalysisResult, type AnalysisStatus } from "./AnalysisResult";
-import { type TextExample } from "./ExampleChips";
 import { TextAnalyzer } from "./TextAnalyzer";
 import { useLanguage } from "./LanguageProvider";
 
@@ -59,9 +58,7 @@ function AnalyzerWorkspaceSession({
   copy,
 }: AnalyzerWorkspaceSessionProps) {
   const history = useAnalysisHistory();
-  const examples = copy.examples as readonly TextExample[];
   const [text, setText] = useState("");
-  const [activeExampleId, setActiveExampleId] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [analyzedText, setAnalyzedText] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>("initial");
@@ -70,7 +67,6 @@ function AnalyzerWorkspaceSession({
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [useGemini, setUseGemini] = useState(geminiConfigured);
   const [isExtracting, setIsExtracting] = useState(false);
   const [documentMessage, setDocumentMessage] = useState<{
     kind: "success" | "warning" | "error";
@@ -80,7 +76,6 @@ function AnalyzerWorkspaceSession({
 
   const handleTextChange = (value: string) => {
     setText(value);
-    setActiveExampleId(null);
     setDocumentMessage(null);
     if (value.trim()) {
       setValidationMessage(null);
@@ -90,7 +85,6 @@ function AnalyzerWorkspaceSession({
   const handleClear = () => {
     if (isBusy) return;
     setText("");
-    setActiveExampleId(null);
     setValidationMessage(null);
     setDocumentMessage(null);
     setResult(null);
@@ -98,14 +92,6 @@ function AnalyzerWorkspaceSession({
     setAnalyzedAt(null);
     setStatus("initial");
     setErrorMessage(null);
-  };
-
-  const handleExampleSelect = (example: TextExample) => {
-    setText(example.text);
-    setActiveExampleId(example.id);
-    setValidationMessage(null);
-    setErrorMessage(null);
-    setDocumentMessage(null);
   };
 
   const handleDocumentSelect = async (file: File) => {
@@ -117,7 +103,6 @@ function AnalyzerWorkspaceSession({
     try {
       const extractedDocument = await extractDocumentText(file);
       setText(extractedDocument.text);
-      setActiveExampleId(null);
       setDocumentMessage({
         kind: extractedDocument.truncated ? "warning" : "success",
         text: extractedDocument.truncated
@@ -156,7 +141,7 @@ function AnalyzerWorkspaceSession({
 
     try {
       const nextResult = await analyzeText(normalizedText, {
-        useGemini: detectTextLanguage(normalizedText) === "uz" || useGemini,
+        useGemini: detectTextLanguage(normalizedText) === "uz" || geminiConfigured,
         locale,
       });
       const analyzedAt = new Date();
@@ -218,7 +203,6 @@ function AnalyzerWorkspaceSession({
 
     setText(item.text);
     setAnalyzedText(item.text);
-    setActiveExampleId(null);
     setResult(restoredResult);
     setAnalyzedAt(new Date(item.analyzedAt));
     setValidationMessage(null);
@@ -237,8 +221,6 @@ function AnalyzerWorkspaceSession({
         <TextAnalyzer
           text={text}
           canClear={text.length > 0 || result !== null || status === "error"}
-          examples={examples}
-          activeExampleId={activeExampleId}
           isLoading={status === "loading"}
           isExtracting={isExtracting}
           validationMessage={validationMessage}
@@ -247,14 +229,11 @@ function AnalyzerWorkspaceSession({
           historyEnabled={history.enabled}
           historyCount={history.items.length}
           geminiConfigured={geminiConfigured}
-          useGemini={useGemini}
           onTextChange={handleTextChange}
           onDocumentSelect={handleDocumentSelect}
           onClear={handleClear}
-          onExampleSelect={handleExampleSelect}
           onSubmit={handleSubmit}
           onOpenHistory={() => { if (!isBusy) setIsHistoryOpen(true); }}
-          onUseGeminiChange={setUseGemini}
         />
 
         <div className="analyzer-result-slot min-w-0">

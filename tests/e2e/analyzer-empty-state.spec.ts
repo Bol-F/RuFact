@@ -75,7 +75,7 @@ test("fresh analyzer stays empty in all languages and reloads without automatic 
   expect(errors).toEqual([]);
 });
 
-test("examples only fill a draft; a submitted result clears and restores from opted-in history", async ({ page }) => {
+test("typing only fills a draft; a submitted result clears and restores from opted-in history", async ({ page }) => {
   const requests: { text: string; locale: string }[] = [];
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
@@ -94,9 +94,9 @@ test("examples only fill a draft; a submitted result clears and restores from op
   await history.getByRole("button", { name: "Включить локальную историю", exact: true }).click();
   await history.getByRole("button", { name: "Закрыть историю", exact: true }).click();
 
-  await page.getByRole("button", { name: "Новость", exact: true }).click();
-  await expect(input).toHaveValue(/Росстата/);
-  const submittedText = await input.inputValue();
+  const submittedText = "По данным Росстата, новый городской парк открылся после реконструкции.";
+  await input.fill(submittedText);
+  await expect(input).toHaveValue(submittedText);
   await expectEmptyResult(page, "ru");
   expect(requests).toEqual([]);
   await page.locator(".analyzer-submit").click();
