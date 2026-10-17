@@ -4,6 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     RUFACT_ENV=production \
     RUFACT_MODEL_PATH=/app/artifacts/model.joblib \
+    RUFACT_EN_MODEL_PATH=/app/artifacts/en/model.joblib \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app

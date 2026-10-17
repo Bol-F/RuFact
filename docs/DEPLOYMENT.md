@@ -87,6 +87,14 @@ Render Docker deployment и проверьте `/health`: `availableModels` до
 Язык текста определяется отдельно от языка интерфейса. Узбекская модель пока не
 обучена; проверка источников работает независимо от доступности ML.
 
+Dockerfile явно задаёт оба пути: `RUFACT_MODEL_PATH=/app/artifacts/model.joblib`
+и `RUFACT_EN_MODEL_PATH=/app/artifacts/en/model.joblib`. Это важно при установке
+пакета с `--no-editable`: его модуль находится в `site-packages`, а артефакты —
+в `/app/artifacts`. Без английского пути новый двухмодельный API не запускается.
+В Vercel эти пути добавлять не нужно. Если Render использует старый образ,
+переразверните актуальный commit и проверьте `availableModels` в `/health`;
+одного `ready: true` от старой русской версии недостаточно.
+
 Репозиторий содержит [`render.yaml`](../render.yaml). Blueprint создаёт Docker-сервис
 на бесплатном плане Render во Франкфурте, проверяет `/health` и запускает
 автодеплой только после успешных GitHub Checks. При создании Blueprint укажите
