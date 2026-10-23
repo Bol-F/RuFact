@@ -294,7 +294,7 @@ test("model page exposes measured errors and limitations", async ({ page }, test
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tavily → Gemini" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Точная арифметика" })).toBeVisible();
-  await expect(page.getByTestId("ru-model-quality").locator("dl dd").first()).toHaveText("80.9%");
+  await expect(page.getByTestId("ru-model-quality").locator("dl dd > span:first-child").first()).toHaveText("80.9%");
   await expect(page.getByText(/tfidf-word-char-logreg-ru-v2/u)).toBeVisible();
   await page.getByTestId("ru-evaluation-details").locator("summary").click();
   await expect(

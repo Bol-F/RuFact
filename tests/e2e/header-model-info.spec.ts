@@ -143,7 +143,7 @@ for (const locale of locales) {
     const russian = page.getByTestId("ru-model-quality");
     await expect(russian).toContainText("tfidf-word-char-logreg-ru-v2");
     await expect(russian).toContainText("3707");
-    await expect(russian.locator("dl dd")).toHaveText(["80.9%", "80.9%", "84.9%", "76.5%"]);
+    await expect(russian.locator("dl dd > span:first-child")).toHaveText(["80.9%", "80.9%", "84.9%", "76.5%"]);
     await expect(page.getByTestId("ru-evaluation-context")).toContainText("157");
     await expect(page.getByTestId("ru-evaluation-context")).toContainText("OOF");
     const english = page.getByTestId("en-model-quality");
@@ -152,7 +152,7 @@ for (const locale of locales) {
     await expect(english).toContainText(/1[\s,]?016/u);
     await expect(english.locator("dl dd")).toHaveText(["65.1%", "63.9%", "65.7%", "75.5%"]);
     const protocol = page.getByTestId("en-evaluation-protocol");
-    await expect(protocol).toContainText("OOF");
+    await expect(protocol).toContainText(locale === "en" ? "training-only 5-fold out-of-fold" : "OOF");
     await expect(protocol).toContainText(/1[\s,]?036/u);
     await expect(protocol).not.toContainText(/halves|половин|alohida qismlar/u);
     const details = page.getByTestId("ru-evaluation-details");
