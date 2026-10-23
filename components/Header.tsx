@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, MessageCircle, X } from "lucide-react";
+import { ArrowUpRight, Menu, MessageCircle, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -12,16 +12,46 @@ import { useLanguage } from "./LanguageProvider";
 import { TextSizeControl } from "./TextSizeControl";
 import { chatCopy } from "@/lib/chat-copy";
 
+interface ChatNavigationLinkProps {
+  label: string;
+  accessibleLabel: string;
+  active: boolean;
+  compact?: boolean;
+  onClick?: () => void;
+}
+
+function ChatNavigationLink({
+  label,
+  accessibleLabel,
+  active,
+  compact = false,
+  onClick,
+}: ChatNavigationLinkProps) {
+  return (
+    <Link
+      href="/chat"
+      aria-label={accessibleLabel}
+      aria-current={active ? "page" : undefined}
+      onClick={onClick}
+      className={`header-chat focus-ring${compact ? " header-chat--compact" : ""}`}
+    >
+      <span className="header-chat-mark" aria-hidden="true">
+        <MessageCircle size={18} strokeWidth={1.8} />
+        <span className="header-chat-spark"><Sparkles size={11} strokeWidth={2} /></span>
+      </span>
+      <span className="header-chat-label">{label}</span>
+      <ArrowUpRight className="header-chat-arrow" size={14} aria-hidden="true" />
+    </Link>
+  );
+}
+
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const { openFeedback } = useFeedback();
   const { copy, locale } = useLanguage();
   const pathname = usePathname();
   const navigation = [
-    { label: chatCopy[locale].nav, href: "/chat" },
-    { label: copy.navigation.how, href: "/#how-it-works" },
     { label: copy.navigation.model, href: "/model" },
-    { label: copy.navigation.faq, href: "/#questions" },
     { label: copy.support.nav, href: "/support" },
   ];
 
@@ -32,6 +62,13 @@ export function Header() {
 
         <nav aria-label={copy.navigation.main} className="hidden xl:block">
           <ul className="flex items-center gap-4 text-[0.875rem] font-medium text-[#173552]">
+            <li>
+              <ChatNavigationLink
+                label={chatCopy[locale].nav}
+                accessibleLabel={chatCopy[locale].open}
+                active={pathname === "/chat"}
+              />
+            </li>
             {navigation.map((item) => (
               <li key={item.href}>
                 <Link
@@ -58,17 +95,24 @@ export function Header() {
         </div>
 
         <div className="ml-auto flex items-center gap-2 xl:hidden">
-          {pathname !== "/chat" ? <Link href="/chat" aria-label={chatCopy[locale].open} className="header-chat focus-ring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-[#cfdbd4] bg-[#edf3ee] px-3 text-xs font-bold text-[#376b60]"><MessageCircle size={16} /><span className="hidden min-[380px]:inline">{chatCopy[locale].nav}</span></Link> : null}
-        <button
-          type="button"
-          className="header-menu focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#d7d8d3] bg-[#fbfaf6] text-ink xl:hidden"
-          aria-expanded={isOpen}
-          aria-controls="mobile-navigation"
-          aria-label={isOpen ? copy.navigation.closeMenu : copy.navigation.openMenu}
-          onClick={() => setIsOpen((value) => !value)}
-        >
-          {isOpen ? <X size={18} /> : <Menu size={18} />}
-        </button>
+          {pathname !== "/chat" ? (
+            <ChatNavigationLink
+              label={chatCopy[locale].nav}
+              accessibleLabel={chatCopy[locale].open}
+              active={false}
+              compact
+            />
+          ) : null}
+          <button
+            type="button"
+            className="header-menu focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#d7d8d3] bg-[#fbfaf6] text-ink xl:hidden"
+            aria-expanded={isOpen}
+            aria-controls="mobile-navigation"
+            aria-label={isOpen ? copy.navigation.closeMenu : copy.navigation.openMenu}
+            onClick={() => setIsOpen((value) => !value)}
+          >
+            {isOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </div>
 
@@ -84,11 +128,20 @@ export function Header() {
             className="absolute left-[14px] right-[14px] top-full max-h-[75dvh] overflow-y-auto rounded-[14px] border border-[#dedbd4] bg-[#fbf9f4] p-2.5 shadow-[0_18px_38px_rgba(21,38,54,0.14)] xl:hidden"
           >
             <ul className="grid gap-1 text-[0.875rem] font-semibold">
+              <li>
+                <ChatNavigationLink
+                  label={chatCopy[locale].nav}
+                  accessibleLabel={chatCopy[locale].open}
+                  active={pathname === "/chat"}
+                  onClick={() => setIsOpen(false)}
+                />
+              </li>
               {navigation.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={() => setIsOpen(false)}
+                    aria-current={pathname === item.href ? "page" : undefined}
                     className="focus-ring block rounded-xl px-3 py-2.5 hover:bg-[#f0ece4]"
                   >
                     {item.label}

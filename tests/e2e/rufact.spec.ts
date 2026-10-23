@@ -240,7 +240,7 @@ test("result actions and feedback dialog work", async ({ page, context }, testIn
   await expect(dialog).toBeVisible();
 });
 
-test("mobile layout, menu and FAQ navigation", async ({ page }, testInfo) => {
+test("mobile layout, simplified menu and retained FAQ content", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile"), "Mobile-only check");
 
   await page.goto("/");
@@ -265,7 +265,13 @@ test("mobile layout, menu and FAQ navigation", async ({ page }, testInfo) => {
 
   await page.getByRole("button", { name: "Открыть меню" }).click();
   await expect(mobileNavigation).toBeVisible();
-  await mobileNavigation.getByRole("link", { name: "Вопросы и ответы" }).click();
+  await expect(mobileNavigation.getByRole("link", { name: "Как это работает" })).toHaveCount(0);
+  await expect(mobileNavigation.getByRole("link", { name: "Вопросы и ответы" })).toHaveCount(0);
+  await mobileNavigation.getByRole("link", { name: "О модели" }).click();
+  await expect(page).toHaveURL(/\/model$/u);
+  await expect(mobileNavigation).toBeHidden();
+  // Removing the header shortcut must not remove the accessible FAQ section.
+  await page.goto("/#questions");
   await expect(page).toHaveURL(/#questions$/u);
   await expect(page.getByRole("heading", { name: "Коротко о главном" })).toBeVisible();
 
@@ -284,20 +290,19 @@ test("model page exposes measured errors and limitations", async ({ page }, test
   await selectRussian(page);
   await expect(page.getByRole("heading", { name: "О системе проверки RuFact" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Как RuFact проверяет текст сейчас" }),
+    page.getByRole("heading", { name: "Разным текстам — разная проверка" }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Поиск Tavily" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Анализ Gemini" })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Accuracy на внешней выборке: 81%" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tavily → Gemini" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Точная арифметика" })).toBeVisible();
+  await expect(page.getByTestId("ru-model-quality").locator("dl dd").first()).toHaveText("80.9%");
   await expect(page.getByText(/tfidf-word-char-logreg-ru-v2/u)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Где модель ошибается" })).toBeVisible();
+  await page.getByTestId("ru-evaluation-details").locator("summary").click();
   await expect(
-    page.getByRole("table", { name: "Матрица ошибок для классов REAL и FAKE" }),
+    page.getByRole("table", { name: "Ошибки REAL и FAKE во внешней русской OOF-оценке" }),
   ).toBeVisible();
-  await expect(page.getByText("Сильные стороны", { exact: true })).toBeVisible();
-  await expect(page.getByText("Ограничения", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Почему нужна осторожность" })).toBeVisible();
+  await expect(page.getByTestId("model-limitations")).toBeVisible();
+  await expect(page.getByTestId("model-system-accuracy-note")).toContainText("пока не измерена");
 
   if (process.env.CAPTURE_QA === "1") {
     await page.screenshot({
