@@ -36,13 +36,15 @@ export type TavilySearchResult =
   | { ok: true; evidence: TavilyEvidence }
   | { ok: false; reason: TavilyFailureReason };
 
-interface TavilyRequest {
+export interface TavilyRequest {
   text: string;
   locale?: AppLocale;
   apiKey: string;
   timeoutMs?: number;
   fetchImpl?: FetchImplementation;
   signal?: AbortSignal;
+  // Server-owned ranking hints; prefer keeps the wider web searchable.
+  preferredDomains?: readonly string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -107,6 +109,7 @@ export async function requestTavilyEvidence({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   fetchImpl = fetch,
   signal,
+  preferredDomains,
 }: TavilyRequest): Promise<TavilySearchResult> {
   const abortScope = createAbortScope(signal, timeoutMs);
 
@@ -125,6 +128,10 @@ export async function requestTavilyEvidence({
         topic: "general",
         language: locale,
         filter_by_language: false,
+        ...(preferredDomains?.length ? {
+          include_domains: preferredDomains,
+          include_domains_mode: "prefer",
+        } : {}),
         include_answer: false,
         include_raw_content: false,
         include_images: false,

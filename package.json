@@ -28,7 +28,7 @@
     "test:telegram": "node --test --experimental-strip-types tests/telegram.test.mjs tests/support-telegram.test.mjs",
     "test:support": "node --test --experimental-strip-types tests/support.test.mjs tests/support-api.test.mjs",
     "test:support-store": "node --test --experimental-strip-types tests/support-store-diagnostic.test.mjs",
-    "test:chat": "node --test --experimental-strip-types tests/chat.test.mjs",
+    "test:chat": "node --test --experimental-strip-types tests/chat.test.mjs tests/chat-search.test.mjs",
     "telegram:setup": "node --env-file=.env.local scripts/setup-telegram.mjs",
     "test:unit": "npm run test:gemini && npm run test:tavily && npm run test:report && npm run test:api && npm run test:verdict && npm run test:routing && npm run test:body && npm run test:artwork && npm run test:claims && npm run test:arithmetic && npm run test:history && npm run test:security && npm run test:telegram && npm run test:support && npm run test:support-store && npm run test:chat",
     "test:e2e": "playwright test",

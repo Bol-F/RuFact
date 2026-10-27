@@ -66,6 +66,23 @@ test("sends a server-authenticated Tavily request and validates sources", async 
   assert.equal(body.max_results, 6);
   assert.equal(body.include_raw_content, false);
   assert.equal(body.safe_search, true);
+  assert.equal("include_domains" in body, false);
+  assert.equal("include_domains_mode" in body, false);
+});
+
+test("empty preferred domains do not send an invalid domain mode", async () => {
+  let body;
+  await requestTavilyEvidence({
+    text: TEST_TEXT,
+    apiKey: TEST_KEY,
+    preferredDomains: [],
+    fetchImpl: async (_input, init) => {
+      body = JSON.parse(init.body);
+      return Response.json({ query: TEST_TEXT, results: [] });
+    },
+  });
+  assert.equal("include_domains" in body, false);
+  assert.equal("include_domains_mode" in body, false);
 });
 
 test("maps exhausted credits and empty results to typed failures", async () => {

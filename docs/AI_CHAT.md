@@ -14,6 +14,24 @@ No new provider key is needed. Both surfaces require server-only `GEMINI_API_KEY
 
 The installed AI SDK Google adapter uses the configured Gemini key directly; no extra paid service is introduced. Factual questions perform one basic Tavily search and one bounded Gemini generation. Whole-message greetings, introductions, thanks and basic app help are answered locally with no search, citations or provider charge. Chat shares the existing per-client/user limits and global daily provider budget: defaults are 5 internet requests per 5 minutes and 30 daily across website and bot. Provider free-tier quotas also apply independently. Continuing a conversation does not bypass those limits; quota failures keep the conversation available for later.
 
+## Uzbek source priority
+
+Uzbek web chat and Telegram `/uz` chat prefer `president.uz`, `gov.uz`
+(government and ministry pages), `lex.uz`, `kun.uz` and `daryo.uz`.
+Both Latin and Cyrillic questions use this policy. The fixed server-owned list
+uses Tavily's `include_domains_mode: "prefer"`, so the same request also searches
+the wider web. It is not a restricted Uzbekistan-only search and does not add
+per-site requests, retries, keys or environment variables. RU/EN chat and the
+statement analyzer retain their existing search policy.
+
+The prompt still requires relevant, current evidence, prioritises primary
+documents over summaries and surfaces unresolved conflicts. Preferred sites
+are not a guarantee of truth. Arbitrary Telegram channels are not treated as
+official; private/unindexed posts are not searched. Official ministry websites
+provide the primary route to their published announcements.
+
+Reference: [Tavily domain preferences](https://docs.tavily.com/documentation/api-reference/endpoint/search#body-include-domains-mode).
+
 ## Data and safety
 
 - Web chat is reachable from the homepage, desktop navigation and a visible mobile header button. The viewport-height workspace keeps the composer available; sources are expandable and citation numbers link directly to retrieved pages. Enter sends on desktop; Shift+Enter inserts a line. Mobile Enter inserts a line.

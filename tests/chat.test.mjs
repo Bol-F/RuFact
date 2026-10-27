@@ -1,13 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseChatMessages, recentChatMessages, safeChatSources } from "../lib/chat.ts";
-import { requestAiChat } from "../lib/server/ai-chat-core.ts";
+import { chatInstructions, requestAiChat } from "../lib/server/ai-chat-core.ts";
 import { localChatReply } from "../lib/chat-local.ts";
 import { parseChatSession, serializeChatSession } from "../lib/chat-session.ts";
 import { arithmeticCopy } from "../lib/arithmetic.ts";
 
 const messages = [{ role: "user", content: "Is Tashkent the capital of Uzbekistan?" }];
 const evidence = { query: "Tashkent", sources: [{ id: "s1", title: "Official source", url: "https://example.org/source", content: "Tashkent is the capital of Uzbekistan." }] };
+
+test("Uzbek source priority remains subordinate to relevance, dates and conflicting evidence", () => {
+  const instructions = chatInstructions("uz", evidence);
+  for (const domain of ["president.uz", "gov.uz", "lex.uz", "kun.uz", "daryo.uz"]) assert.ok(instructions.includes(domain));
+  assert.match(instructions, /retrieval preference, not proof of truth/u);
+  assert.match(instructions, /relevant to the actual question/u);
+  assert.match(instructions, /do not force a global question into an Uzbekistan context/u);
+  assert.match(instructions, /must not override better or more recent evidence/u);
+  assert.match(instructions, /Compare conflicting evidence/u);
+  assert.match(instructions, /Do not treat an arbitrary Telegram channel as official/u);
+  for (const locale of ["ru", "en"]) {
+    const other = chatInstructions(locale, evidence);
+    assert.doesNotMatch(other, /Uzbek chat search favours/u);
+    assert.match(other, /Prefer primary sources, check dates and context/u);
+  }
+});
 
 test("whole arithmetic equations are answered exactly in local chat without search or model generation", async () => {
   for (const locale of ["en", "ru", "uz"]) {
