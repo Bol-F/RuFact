@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 import { analyzeText, getCalculationAnalysis, getMockAnalysis, type AnalysisResponse } from "@/lib/api";
 import type { HistoryItem } from "@/lib/analysis-history";
@@ -73,6 +73,7 @@ function AnalyzerWorkspaceSession({
     text: string;
   } | null>(null);
   const isBusy = status === "loading" || isExtracting;
+  const submissionInFlight = useRef(false);
 
   const handleTextChange = (value: string) => {
     setText(value);
@@ -126,6 +127,9 @@ function AnalyzerWorkspaceSession({
   };
 
   const handleSubmit = async () => {
+    // The ref closes the gap before React commits the loading/disabled state.
+    // Keyboard and pointer submission share the same in-flight request guard.
+    if (isBusy || submissionInFlight.current) return;
     const normalizedText = text.trim();
 
     if (!normalizedText) {
@@ -134,6 +138,7 @@ function AnalyzerWorkspaceSession({
       return;
     }
 
+    submissionInFlight.current = true;
     setValidationMessage(null);
     setErrorMessage(null);
     setText(normalizedText);
@@ -170,6 +175,8 @@ function AnalyzerWorkspaceSession({
         copy.analyzer.serviceError,
       );
       setStatus("error");
+    } finally {
+      submissionInFlight.current = false;
     }
   };
 

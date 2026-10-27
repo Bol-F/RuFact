@@ -94,11 +94,18 @@ export function TextAnalyzer({
           id="analysis-text"
           value={text}
           maxLength={MAX_LENGTH}
+          enterKeyHint="send"
           disabled={isBusy}
           aria-describedby="text-counter text-helper analyzer-source-notice"
           aria-invalid={Boolean(validationMessage)}
           aria-errormessage={validationMessage ? "text-validation" : undefined}
           onChange={(event) => onTextChange(event.target.value)}
+          onKeyDown={(event) => {
+            // Leave IME confirmation and Shift+Enter to the textarea.
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            event.preventDefault();
+            if (!isBusy && !event.repeat) onSubmit();
+          }}
           className={`focus-ring block min-h-[152px] w-full resize-none rounded-[12px] border bg-[rgba(255,255,255,0.42)] px-3 py-2.5 text-[0.78125rem] leading-[1.42] text-[#303b4d] shadow-inner shadow-[#16324a]/[0.015] transition-colors placeholder:text-[#8993a0] disabled:cursor-wait disabled:opacity-75 sm:min-h-[184px] sm:rounded-[14px] sm:px-4 sm:py-3 sm:text-[1rem] sm:leading-[1.48] ${
             validationMessage
               ? "border-[#d98383]"
@@ -203,7 +210,7 @@ export function TextAnalyzer({
 
         <p id="text-helper" className="text-center text-[0.59375rem] leading-[1.35] text-[#77859a] sm:max-w-[230px] sm:text-left sm:text-[0.75rem] sm:leading-[1.45]">
           {copy.analyzer.helper}
-          <span className="hidden sm:inline"><br />{copy.analyzer.helperDesktop}</span>
+          <span className="block mt-1">{copy.analyzer.helperDesktop}</span>
         </p>
       </div>
       <p id="analyzer-source-notice" data-testid="analyzer-source-notice" className="mt-3 text-[0.6875rem] leading-[1.45] text-[#718092] sm:text-[0.75rem]">

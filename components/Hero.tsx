@@ -1,9 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
-import { ArrowDown, ArrowUpRight, MessageCircle } from "lucide-react";
-import { chatCopy } from "@/lib/chat-copy";
 import { REGIONAL_ARTWORK } from "@/lib/regional-artwork";
 
 import { MODEL_QUALITY } from "@/lib/model-quality";
@@ -73,10 +70,6 @@ export function Hero() {
             {copy.hero.desktopDescription}{locale === "ru" ? ` Русская ML-модель показала ${Math.round((accuracy ?? 0) * 100)}% accuracy на отдельной внешней выборке.` : ""}
           </span>
         </motion.p>
-        <div className="relative mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
-          <Link href="/#analyzer" className="hero-primary focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-semibold text-white">{chatCopy[locale].check}<ArrowDown size={16} aria-hidden="true" /></Link>
-          <Link href="/chat" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#cbd8d0] bg-white/70 px-4 text-sm font-semibold"><MessageCircle size={17} aria-hidden="true" />{chatCopy[locale].open}<ArrowUpRight size={16} aria-hidden="true" /></Link>
-        </div>
       </motion.div>
 
       <HeroArtwork locale={locale} noteLeft={copy.hero.noteLeft} noteRight={copy.hero.noteRight} />

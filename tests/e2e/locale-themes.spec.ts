@@ -135,14 +135,14 @@ test("Uzbek teal and English navy-copper colors apply to the shared hero and con
     }
     await expect(page.locator("header .brand > span:first-child > span:first-child")).toHaveCSS("background-color", palette.ink);
     await expect(page.locator("header .brand > span:first-child > span:last-child")).toHaveCSS("background-color", palette.accent);
-    await expect(page.locator(".hero-primary")).toHaveCSS("background-color", palette.primary);
+    await expect(page.locator(".hero-primary")).toHaveCount(0);
     await expect(page.locator(".header-feedback")).toHaveCSS("background-color", palette.primary);
     await expect(page.locator(".analyzer-submit")).toHaveCSS("background-color", palette.primary);
     await expect(page.locator(".analyzer-submit")).toHaveCSS("background-image", "none");
     await page.keyboard.press("Tab");
-    await page.locator(".hero-primary").focus();
-    await expect(page.locator(".hero-primary")).toHaveCSS("outline-color", palette.accent);
-    await expect(page.locator(".hero-primary")).toHaveCSS("outline-width", "3px");
+    await page.locator(".analyzer-submit").focus();
+    await expect(page.locator(".analyzer-submit")).toHaveCSS("outline-color", palette.accent);
+    await expect(page.locator(".analyzer-submit")).toHaveCSS("outline-width", "3px");
   }
   await changeLanguage(page, "ru");
   await expect(page.locator("#hero-heading")).toHaveCSS("color", "rgb(16, 47, 80)");
