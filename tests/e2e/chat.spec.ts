@@ -19,6 +19,7 @@ test("localized chat works on phone and desktop with follow-ups and clearing", a
   // otherwise mutate the still-unhydrated feedback textarea and cause a false warning.
   await changeLanguage(page, "en");
   await changeLanguage(page, "uz");
+  await expect(page.getByText("Kun.uz, Daryo va rasmiy saytlar ustuvor", { exact: false })).toBeVisible();
   await page.screenshot({ path: join(tmpdir(), `rufact-chat-empty-${testInfo.project.name}.png`) });
   await page.getByRole("button", { name: "O‘zbekiston poytaxti Toshkentmi?" }).click();
   const input = page.getByRole("textbox", { name: "AI chat uchun savol" });
