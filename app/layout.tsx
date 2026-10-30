@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Caveat, Lora, Manrope } from "next/font/google";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { PreferencesProvider } from "@/components/PreferencesProvider";
 import "./globals.css";
 import "./shared-ui.css";
 
@@ -49,12 +50,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz-Latn-UZ" data-locale="uz" data-scroll-behavior="smooth">
+    <html lang="uz-Latn-UZ" data-locale="uz" data-theme="uz" data-scroll-behavior="smooth">
       <body
         className={`${lora.variable} ${manrope.variable} ${caveat.variable}`}
       >
         <LanguageProvider>
-          <FeedbackProvider>{children}</FeedbackProvider>
+          <PreferencesProvider><FeedbackProvider>{children}</FeedbackProvider></PreferencesProvider>
         </LanguageProvider>
       </body>
     </html>

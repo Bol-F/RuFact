@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { analysisFixture } from "./helpers/analysis";
-import { changeLanguage } from "./helpers/language";
+import { changeLanguage, openProfile } from "./helpers/language";
 
 async function expectResetAnalyzer(page: Page) {
   await expect(page.locator("#analysis-text")).toHaveValue("");
@@ -11,7 +11,7 @@ async function expectResetAnalyzer(page: Page) {
   await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"], .analysis-result section[data-verdict-label="REAL"]')).toHaveCount(0);
 }
 
-test("checking locks history and Clear so a pending request cannot undo a user reset", async ({ page }) => {
+test("checking locks history restoration and Clear while profile settings remain available", async ({ page }) => {
   const requests: { text: string; locale: string }[] = [];
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
@@ -26,19 +26,19 @@ test("checking locks history and Clear so a pending request cannot undo a user r
   });
   await page.goto("/");
   await changeLanguage(page, "ru");
-  const historyTrigger = page.locator("#analysis-history-trigger");
-  const history = page.locator("#analysis-history-dialog");
   const input = page.locator("#analysis-text");
-  await historyTrigger.click();
-  await history.getByRole("button", { name: "Включить локальную историю", exact: true }).click();
-  await history.getByRole("button", { name: "Закрыть историю", exact: true }).click();
+  const history = await openProfile(page);
+  await history.getByTestId("profile-history-enabled").check();
+  await page.keyboard.press("Escape");
+  await expect(history).not.toBeVisible();
 
   await input.fill("Первый проверенный текст сохраняется в истории с согласия пользователя.");
   await page.locator(".analyzer-submit").click();
   await expect(page.locator('.analysis-result section[data-verdict-label="REAL"]')).toBeVisible();
-  await historyTrigger.click();
-  await expect(history.getByRole("listitem")).toHaveCount(1);
-  await history.getByRole("button", { name: "Закрыть историю", exact: true }).click();
+  await openProfile(page);
+  await expect(history.getByTestId("profile-history-item")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(history).not.toBeVisible();
 
   const secondText = "Второй текст проверяется, пока сохранённый результат остаётся в истории.";
   await input.fill(secondText);
@@ -48,8 +48,9 @@ test("checking locks history and Clear so a pending request cannot undo a user r
     for (const locale of ["en", "uz", "ru"] as const) {
       await changeLanguage(page, locale);
       await expect(page.locator(".analysis-result")).toHaveAttribute("aria-busy", "true");
-      await expect(historyTrigger).toBeDisabled();
-      await expect(historyTrigger).toHaveAttribute("aria-expanded", "false");
+      await openProfile(page);
+      await expect(history.getByTestId("profile-history-item").getByRole("button", { name: /^(Open text|Matnni ochish|Открыть текст)$/ })).toBeDisabled();
+      await page.keyboard.press("Escape");
       await expect(history).not.toBeVisible();
       await expect(input).toBeDisabled();
       await expect(input).toHaveValue(secondText);
@@ -59,7 +60,7 @@ test("checking locks history and Clear so a pending request cannot undo a user r
     release();
   }
   await expect(page.locator('.analysis-result section[data-verdict-label="FAKE"]')).toContainText("87%");
-  await expect(historyTrigger).toBeEnabled();
+  await expect(page.locator("[data-profile-trigger]:visible").first()).toBeEnabled();
   await page.getByRole("button", { name: "Очистить текст", exact: true }).click();
   await expectResetAnalyzer(page);
   for (const locale of ["uz", "en", "ru"] as const) {
@@ -92,7 +93,7 @@ test("an error can be cleared even after the failed text was manually deleted", 
   expect(requests).toHaveLength(1);
 });
 
-test("document extraction also locks history and Clear without triggering an analysis", async ({ page }) => {
+test("document extraction keeps profile available but locks analyzer changes without starting a check", async ({ page }) => {
   let extractionRequests = 0;
   const analysisRequests: unknown[] = [];
   let release!: () => void;
@@ -118,12 +119,13 @@ test("document extraction also locks history and Clear without triggering an ana
   await page.getByLabel("Загрузить документ").setInputFiles({
     name: "report.txt", mimeType: "text/plain", buffer: Buffer.from(extractedText, "utf8"),
   });
-  const historyTrigger = page.locator("#analysis-history-trigger");
   const clear = page.getByRole("button", { name: "Очистить текст", exact: true });
   try {
     await expect.poll(() => extractionRequests).toBe(1);
-    await expect(historyTrigger).toBeDisabled();
-    await expect(page.locator("#analysis-history-dialog")).not.toBeVisible();
+    const profile = await openProfile(page);
+    await expect(profile).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(profile).not.toBeVisible();
     await expect(clear).toBeDisabled();
     await expect(page.locator("#analysis-text")).toBeDisabled();
     await expect(page.locator(".analysis-result.result-empty")).toBeVisible();
@@ -132,7 +134,7 @@ test("document extraction also locks history and Clear without triggering an ana
     release();
   }
   await expect(page.locator("#analysis-text")).toHaveValue(extractedText);
-  await expect(historyTrigger).toBeEnabled();
+  await expect(page.locator("[data-profile-trigger]:visible").first()).toBeEnabled();
   await expect(clear).toBeEnabled();
   await expect(page.locator(".text-analyzer").getByRole("status")).toContainText("report.txt");
   await expect(page.locator(".analysis-result.result-empty")).toBeVisible();

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { chatCopy } from "../../lib/chat-copy";
 import { getTranslations } from "../../lib/i18n";
-import { changeLanguage, type Locale } from "./helpers/language";
+import { changeLanguage, chooseProfileOption, openProfile, type Locale } from "./helpers/language";
 
 // Browser plugin not available. Use the repository's isolated Playwright fixture;
 // navigation checks never send text to providers, Redis, Telegram, or payments.
@@ -202,10 +202,13 @@ test("compact navigation remains usable with larger text in all languages", asyn
   await page.goto("/");
   for (const locale of locales) {
     await changeLanguage(page, locale);
-    const navigation = await openNavigation(page);
-    const textSize = navigation.locator(".text-size-control button").last();
-    await textSize.click();
+    const profile = await openProfile(page);
+    await chooseProfileOption(page, "text-size", "larger");
     await expect(page.locator("html")).toHaveAttribute("data-text-size", "larger");
+    await page.keyboard.press("Escape");
+    await expect(profile).not.toBeVisible();
+    const navigation = await openNavigation(page);
+    await expect(navigation.locator(".text-size-control")).toHaveCount(0);
     // The built-in preference is 125%; also stress root-relative controls at 150%.
     await page.evaluate(() => { document.documentElement.style.fontSize = "150%"; });
     await expectChatCta(navigation.locator('a[href="/chat"]'), locale);

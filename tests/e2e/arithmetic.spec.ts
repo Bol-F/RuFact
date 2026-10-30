@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AnalysisResponse } from "../../lib/api";
 import type { AppLocale } from "../../lib/i18n";
-import { changeLanguage } from "./helpers/language";
+import { changeLanguage, openProfile } from "./helpers/language";
 
 // Real browser -> local /api/analyze -> bounded exact calculation. Unlike the
 // source presentation fixtures, this suite never substitutes the API response.
@@ -115,13 +115,12 @@ test("calculation history recomputes the equation instead of trusting the stored
   page.on("request", request => { if (/\/api\/analyze(?:\?|$)/.test(request.url())) requests.push(request.url()); });
   await page.goto("/");
   await changeLanguage(page, "en");
-  await page.locator("#analysis-history-trigger").click();
-  const history = page.getByRole("dialog", { name: "Check history", exact: true });
-  await expect(history.getByRole("listitem")).toHaveCount(1);
-  await expect(history).toContainText("Calculation");
+  const history = await openProfile(page);
+  await expect(history.getByTestId("profile-history-item")).toHaveCount(1);
+  await expect(history.getByTestId("profile-history-item")).toContainText("2+2=5");
   await expect(history).not.toContainText(/ML ·|100%|0%/);
   await expect(history.locator("time")).toHaveAttribute("datetime", analyzedAt);
-  await history.getByRole("button", { name: "Open", exact: true }).click();
+  await history.getByRole("button", { name: "Open text", exact: true }).click();
   await expect(history).not.toBeVisible();
   await expect(page.locator('[data-verdict-basis="calculation"]')).toHaveAttribute("data-verdict-label", "FAKE");
   await expect(page.getByTestId("calculation-original")).toHaveText("2+2=5");
@@ -146,9 +145,8 @@ test("invalid calculation history restores as unavailable, never as a stored gre
   }, { text });
   await page.goto("/");
   await changeLanguage(page, "en");
-  await page.locator("#analysis-history-trigger").click();
-  const history = page.getByRole("dialog", { name: "Check history", exact: true });
-  await history.getByRole("button", { name: "Open", exact: true }).click();
+  const history = await openProfile(page);
+  await history.getByRole("button", { name: "Open text", exact: true }).click();
   await expect(page.locator('[data-verdict-basis="unavailable"]')).toHaveAttribute("data-verdict-label", "UNSURE");
   await expect(page.locator("#analysis-text")).toHaveValue(text);
   await expect(page.locator('.analysis-result [role="meter"], .analysis-result [data-verdict-basis="statistical"]')).toHaveCount(0);

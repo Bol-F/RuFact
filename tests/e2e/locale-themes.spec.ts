@@ -1,9 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { changeLanguage } from "./helpers/language";
+import { changeLanguage, chooseProfileOption, openProfile } from "./helpers/language";
 import { analysisFixture } from "./helpers/analysis";
 import { HERO_ARTWORK } from "../../lib/hero-artwork";
+
+async function changeTextSize(page: Page, size: "normal" | "large" | "larger") {
+  const profile = await openProfile(page);
+  await chooseProfileOption(page, "text-size", size);
+  await expect(page.locator("html")).toHaveAttribute("data-text-size", size);
+  await page.keyboard.press("Escape");
+  await expect(profile).not.toBeVisible();
+}
 
 async function navigateFromHeader(page: Page, href: string) {
   const menu = page.locator('header button[aria-controls="mobile-navigation"]');
@@ -300,7 +308,7 @@ test("enlarged text keeps narrow desktop verdicts and result headings readable",
     meta: { engine: "external-model", engineVersion: "layout-regression-v1", externalSourcesChecked: false },
   } }));
   await page.goto("/");
-  await page.locator(".site-footer .text-size-control button").last().click();
+  await changeTextSize(page, "larger");
   await expect(page.locator("html")).toHaveAttribute("data-text-size", "larger");
   await changeLanguage(page, "ru");
   async function expectReadableResult() {
@@ -386,7 +394,7 @@ test("regional photo collages and handwritten notes fit desktop layouts and larg
     await changeLanguage(page, "ru");
     await changeLanguage(page, "uz");
     for (const size of ["normal", "larger"] as const) {
-      await page.locator(".site-footer .text-size-control button").nth(size === "normal" ? 0 : 2).click();
+      await changeTextSize(page, size);
       await expect(page.locator("html")).toHaveAttribute("data-text-size", size);
       await page.goto("/");
       for (const locale of ["uz", "en"] as const) {
@@ -457,11 +465,12 @@ test("all regional themes and mobile menus fit 320px and 412px phones", async ({
       expect(await page.locator("#analysis-text").evaluate(element =>
         parseFloat(getComputedStyle(element).fontSize),
       )).toBeGreaterThanOrEqual(16);
+      await changeTextSize(page, "larger");
+      await expect(page.locator("html")).toHaveAttribute("data-text-size", "larger");
       const menu = page.locator('header button[aria-controls="mobile-navigation"]');
       await menu.click();
       await expect(page.locator("#mobile-navigation")).toBeVisible();
-      await page.locator("#mobile-navigation .text-size-control button").last().click();
-      await expect(page.locator("html")).toHaveAttribute("data-text-size", "larger");
+      await expect(page.locator("#mobile-navigation .text-size-control")).toHaveCount(0);
       await expectNoOverflow(page);
       expect(await menu.evaluate(element => element.getBoundingClientRect().right <= innerWidth)).toBe(true);
       await page.screenshot({ path: join(tmpdir(), `rufact-theme-${locale}-menu-${width}.png`) });

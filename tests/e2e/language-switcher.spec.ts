@@ -1,14 +1,11 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { changeLanguage, languageNames, type Locale } from "./helpers/language";
+import { changeLanguage, chooseProfileOption, languageNames, openProfile, type Locale } from "./helpers/language";
 
 async function languageTrigger(page: Page) {
-  const navigationToggle = page.locator('header button[aria-controls="mobile-navigation"]');
-  if (await navigationToggle.isVisible() && await navigationToggle.getAttribute("aria-expanded") !== "true") {
-    await navigationToggle.click();
-  }
-  return page.locator("header button[data-language-trigger]:visible");
+  const profile = await openProfile(page);
+  return profile.locator("button[data-language-trigger]");
 }
 
 async function openLanguageMenu(page: Page) {
@@ -146,21 +143,22 @@ test("Tab and outside clicks dismiss the language menu without changing the sele
   await expect(page.locator("html")).toHaveAttribute("data-locale", "uz");
 
   ({ trigger } = await openLanguageMenu(page));
-  await page.locator("header .brand").click();
+  await page.getByTestId("profile-dialog").locator("#profile-heading").click();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator(".language-menu:visible")).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-locale", "uz");
   expect(errors).toEqual([]);
 });
 
-test("language menu stays inside narrow phones and enlarged desktop headers", async ({ page }, testInfo) => {
+test("language menu stays inside narrow phones and enlarged profile settings", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const compact = testInfo.project.name.startsWith("mobile");
   const widths = compact ? [320, 412] : [1280, 1440];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/");
-    await page.locator(".site-footer .text-size-control button").last().click();
+    await openProfile(page);
+    await chooseProfileOption(page, "text-size", "larger");
     await expect(page.locator("html")).toHaveAttribute("data-text-size", "larger");
     await expect(page.locator("html")).toHaveCSS("font-size", "20px");
     for (const locale of ["uz", "ru", "en"] as Locale[]) {

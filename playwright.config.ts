@@ -74,7 +74,7 @@ export default defineConfig({
     {
       // A test worker loads the models once. Watching the entire repo/node_modules
       // adds startup work and can restart inference while a browser test is running.
-      command: "uv run --project ml uvicorn rufact_ml.main:app --app-dir ml/src --port 8010",
+      command: "uv run --project ml python -m uvicorn rufact_ml.main:app --app-dir ml/src --port 8010",
       url: "http://127.0.0.1:8010/health",
       env: testServiceEnvironment,
       reuseExistingServer: false,

@@ -10,7 +10,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { DOCUMENT_ACCEPT } from "@/lib/document-upload";
-import { HistoryTrigger } from "./HistoryTrigger";
+import { TopicControl } from "./TopicControl";
+import type { SearchTopic } from "@/lib/search-topics";
 import { useLanguage } from "./LanguageProvider";
 
 interface TextAnalyzerProps {
@@ -20,15 +21,13 @@ interface TextAnalyzerProps {
   isExtracting: boolean;
   validationMessage: string | null;
   documentMessage: { kind: "success" | "warning" | "error"; text: string } | null;
-  historyOpen: boolean;
-  historyEnabled: boolean;
-  historyCount: number;
+  topic: SearchTopic;
+  onTopicChange: (topic: SearchTopic) => void;
   geminiConfigured: boolean;
   onTextChange: (value: string) => void;
   onDocumentSelect: (file: File) => void;
   onClear: () => void;
   onSubmit: () => void;
-  onOpenHistory: () => void;
 }
 
 const MAX_LENGTH = 5000;
@@ -39,15 +38,13 @@ export function TextAnalyzer({
   isExtracting,
   validationMessage,
   documentMessage,
-  historyOpen,
-  historyEnabled,
-  historyCount,
+  topic,
+  onTopicChange,
   geminiConfigured,
   onTextChange,
   onDocumentSelect,
   onClear,
   onSubmit,
-  onOpenHistory,
 }: TextAnalyzerProps) {
   const isBusy = isLoading || isExtracting;
   const { copy } = useLanguage();
@@ -66,13 +63,6 @@ export function TextAnalyzer({
           </h2>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <HistoryTrigger
-            disabled={isBusy}
-            isOpen={historyOpen}
-            enabled={historyEnabled}
-            itemCount={historyCount}
-            onOpen={onOpenHistory}
-          />
           <button
             type="button"
             onClick={onClear}
@@ -85,6 +75,8 @@ export function TextAnalyzer({
           </button>
         </div>
       </div>
+
+      <div className="mb-3"><TopicControl value={topic} onChange={onTopicChange} disabled={isBusy} /></div>
 
       <div>
         <label htmlFor="analysis-text" className="sr-only">

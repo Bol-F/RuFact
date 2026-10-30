@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useRef, useState, type FormEvent } from "react";
 import { useLanguage } from "./LanguageProvider";
+import { usePreferences } from "./PreferencesProvider";
+import { TopicControl } from "./TopicControl";
+import type { SearchTopic } from "@/lib/search-topics";
 import { chatCopy } from "@/lib/chat-copy";
 import { CHAT_MESSAGE_LIMIT, recentChatMessages, safeChatSources, type ChatMessage, type ChatReply } from "@/lib/chat";
 import { CHAT_SESSION_KEY, VISIBLE_TURN_LIMIT, parseChatSession, serializeChatSession, type ChatTurn } from "@/lib/chat-session";
@@ -20,6 +23,9 @@ function Answer({ reply }: { reply: Extract<ChatReply, { status: "complete" }> }
 
 export function AiChat() {
   const { locale } = useLanguage();
+  const { preferences } = usePreferences();
+  const [topicOverride, setTopicOverride] = useState<{ base: SearchTopic; value: SearchTopic } | null>(null);
+  const topic = topicOverride?.base === preferences.topic ? topicOverride.value : preferences.topic;
   const router = useRouter();
   const copy = chatCopy[locale];
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -72,7 +78,7 @@ export function AiChat() {
     setBusy(true); setError(""); setDraft(""); setRestored(false);
     setTurns([...completed.filter(turn => turn.reply), { question: question.trim() }].slice(-VISIBLE_TURN_LIMIT));
     try {
-      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages, locale }), signal: AbortSignal.any([abort.signal, AbortSignal.timeout(35_000)]) });
+      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages, locale, ...(topic !== "general" ? { topic } : {}) }), signal: AbortSignal.any([abort.signal, AbortSignal.timeout(35_000)]) });
       const reply = await response.json() as ChatReply;
       if (controller.current !== abort) return;
       if (!response.ok || reply.status !== "complete") {
@@ -136,6 +142,7 @@ export function AiChat() {
             {error ? <div role="alert" className="mt-5 rounded-xl border border-[#edd6c8] bg-[#fff1e7] p-4 text-sm leading-relaxed"><p>{error}</p>{retryQuestion ? <button type="button" onClick={() => void ask(retryQuestion, true)} className="focus-ring mt-2 min-h-11 rounded-lg px-3 font-bold underline">{copy.retry}</button> : null}</div> : null}
           </div>
           <form onSubmit={submit} className="chat-composer shrink-0 border-t border-[#e2e6df] bg-[#fffdf9] p-3 sm:px-5">
+            <div className="mb-2"><TopicControl value={topic} onChange={value => setTopicOverride({ base: preferences.topic, value })} disabled={busy} /></div>
             {lastReply && !busy ? <div className="chat-followups mb-2 flex flex-wrap gap-2">{[[copy.more, copy.moreQuestion], [copy.explain, copy.explainQuestion]].map(([label, question]) => <button key={label} type="button" onClick={() => { setDraft(question); input.current?.focus(); }} className="focus-ring min-h-11 rounded-xl border border-[#e0e5df] px-3 text-xs font-semibold text-[#46716a] hover:bg-[#edf2ed]">{label} ↗</button>)}</div> : null}
             <div className="flex items-end gap-2 rounded-2xl border border-[#cbd8d0] bg-white p-2 shadow-sm focus-within:ring-2 focus-within:ring-[#6d9186]/30"><textarea ref={input} aria-label={copy.input} placeholder={copy.placeholder} value={draft} maxLength={CHAT_MESSAGE_LIMIT} rows={1} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia("(pointer: fine)").matches) { event.preventDefault(); void ask(draft); } }} className="min-h-11 min-w-0 flex-1 resize-none rounded-xl px-2 py-2 text-base leading-relaxed outline-none" />{busy ? <button key="stop" type="button" aria-label={copy.stop} title={copy.stop} onClick={cancel} className="focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink text-white"><Square size={17} /></button> : <button key="send" type="submit" aria-label={copy.send} title={copy.send} disabled={!ready || !draft.trim()} className="focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink text-white disabled:opacity-40"><ArrowUp size={21} /></button>}</div>
             <div className="mt-2 flex justify-between gap-2 text-[0.6875rem] leading-relaxed text-muted"><p className="hidden sm:block">{copy.keyboard}</p><p className="sm:hidden">{copy.hint}</p><p className="shrink-0">{draft.length} / {CHAT_MESSAGE_LIMIT}</p></div>

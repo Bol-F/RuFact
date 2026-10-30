@@ -1,16 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 import { analyzeText, getCalculationAnalysis, getMockAnalysis, type AnalysisResponse } from "@/lib/api";
 import type { HistoryItem } from "@/lib/analysis-history";
 import { extractDocumentText } from "@/lib/document-upload";
 import { localeTags, type AppLocale } from "@/lib/i18n";
 import { detectTextLanguage } from "@/lib/text-language";
-import { AnalysisHistoryDialog } from "./AnalysisHistoryDialog";
 import { AnalysisResult, type AnalysisStatus } from "./AnalysisResult";
 import { TextAnalyzer } from "./TextAnalyzer";
 import { useLanguage } from "./LanguageProvider";
+import { usePreferences } from "./PreferencesProvider";
+import type { SearchTopic } from "@/lib/search-topics";
 
 interface AnalyzerWorkspaceProps {
   geminiConfigured: boolean;
@@ -58,6 +59,9 @@ function AnalyzerWorkspaceSession({
   copy,
 }: AnalyzerWorkspaceSessionProps) {
   const history = useAnalysisHistory();
+  const { preferences } = usePreferences();
+  const [topicOverride, setTopicOverride] = useState<{ base: SearchTopic; value: SearchTopic } | null>(null);
+  const topic = topicOverride?.base === preferences.topic ? topicOverride.value : preferences.topic;
   const [text, setText] = useState("");
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [analyzedText, setAnalyzedText] = useState<string | null>(null);
@@ -66,7 +70,6 @@ function AnalyzerWorkspaceSession({
   const timestamp = analyzedAt ? formatTimestamp(analyzedAt, locale) : "";
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [documentMessage, setDocumentMessage] = useState<{
     kind: "success" | "warning" | "error";
@@ -148,6 +151,7 @@ function AnalyzerWorkspaceSession({
       const nextResult = await analyzeText(normalizedText, {
         useGemini: detectTextLanguage(normalizedText) === "uz" || geminiConfigured,
         locale,
+        ...(topic !== "general" ? { topic } : {}),
       });
       const analyzedAt = new Date();
       setResult(nextResult);
@@ -180,7 +184,7 @@ function AnalyzerWorkspaceSession({
     }
   };
 
-  const handleHistoryRestore = (item: HistoryItem) => {
+  const handleHistoryRestore = useCallback((item: HistoryItem) => {
     if (isBusy) return;
     const restoredResult: AnalysisResponse =
       // Compact history deliberately stores no calculation result. Recompute
@@ -215,12 +219,35 @@ function AnalyzerWorkspaceSession({
     setValidationMessage(null);
     setErrorMessage(null);
     setStatus("success");
-    setIsHistoryOpen(false);
-  };
+  }, [isBusy, locale]);
+
+  const restoredHistoryId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!history.isHydrated) return;
+    const restoreId = (id: unknown) => {
+      if (isBusy || typeof id !== "string") return false;
+      const item = history.items.find(entry => entry.id === id);
+      if (!item) return false;
+      handleHistoryRestore(item);
+      requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById("analysis-text")?.focus()));
+      return true;
+    };
+    const restore = (event: Event) => { if (!restoreId((event as CustomEvent<unknown>).detail)) event.preventDefault(); };
+    window.addEventListener("rufact-history-restore", restore);
+    const url = new URL(window.location.href);
+    const requested = url.searchParams.get("history");
+    if (requested && restoredHistoryId.current !== requested && restoreId(requested)) {
+      restoredHistoryId.current = requested;
+      url.searchParams.delete("history");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    return () => window.removeEventListener("rufact-history-restore", restore);
+  }, [history.isHydrated, history.items, isBusy, handleHistoryRestore]);
 
   return (
     <section
       id="analyzer"
+      aria-busy={isBusy}
       aria-label={copy.analyzer.region}
       className="tool-gutter relative z-10 pb-4 pt-1 sm:pb-6 sm:pt-[11px]"
     >
@@ -232,15 +259,13 @@ function AnalyzerWorkspaceSession({
           isExtracting={isExtracting}
           validationMessage={validationMessage}
           documentMessage={documentMessage}
-          historyOpen={isHistoryOpen}
-          historyEnabled={history.enabled}
-          historyCount={history.items.length}
+          topic={topic}
+          onTopicChange={value => setTopicOverride({ base: preferences.topic, value })}
           geminiConfigured={geminiConfigured}
           onTextChange={handleTextChange}
           onDocumentSelect={handleDocumentSelect}
           onClear={handleClear}
           onSubmit={handleSubmit}
-          onOpenHistory={() => { if (!isBusy) setIsHistoryOpen(true); }}
         />
 
         <div className="analyzer-result-slot min-w-0">
@@ -255,18 +280,6 @@ function AnalyzerWorkspaceSession({
         </div>
       </div>
 
-      <AnalysisHistoryDialog
-        isOpen={isHistoryOpen}
-        enabled={history.enabled}
-        items={history.items}
-        errorMessage={history.error?.message ?? null}
-        onClose={() => setIsHistoryOpen(false)}
-        onEnable={history.enable}
-        onDisable={history.disable}
-        onClear={history.clear}
-        onDelete={history.remove}
-        onRestore={handleHistoryRestore}
-      />
     </section>
   );
 }

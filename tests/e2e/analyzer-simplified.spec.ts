@@ -56,7 +56,8 @@ test("simplified analyzer keeps privacy, upload and history while checking only 
     await expect(analyzer.locator('[aria-pressed], [aria-label="Text examples"], [aria-label="Примеры текстов"], [aria-label="Matn misollari"]')).toHaveCount(0);
     await expect(analyzer.getByRole("button", { name: /^(News|Social post|Medical claim|Political statement|Новость|Пост из соцсетей|Медицинское утверждение|Политическое заявление)$/ })).toHaveCount(0);
     await expect(analyzer.locator('input[type="file"]')).toBeEnabled();
-    await expect(page.locator("#analysis-history-trigger")).toBeEnabled();
+    await expect(page.locator("#analysis-history-trigger")).toHaveCount(0);
+    await expect(page.locator("[data-profile-trigger]:visible").first()).toBeEnabled();
     await expect(notice).toBeVisible();
     await expect(notice).not.toHaveText("");
     await expect(notice).toHaveCSS("border-top-width", "0px");

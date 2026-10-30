@@ -1,16 +1,21 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, Menu, MessageCircle, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Menu, MessageCircle, Sparkles, UserRound, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { Brand } from "./Brand";
 import { useFeedback } from "./FeedbackProvider";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
-import { TextSizeControl } from "./TextSizeControl";
 import { chatCopy } from "@/lib/chat-copy";
+
+const ProfileDialog = dynamic(() => import("./ProfileDialog").then(module => module.ProfileDialog), { ssr: false });
+const profileLabels = { uz: "Profil va sozlamalar", ru: "Профиль и настройки", en: "Profile and settings" };
+const subscribeHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 
 interface ChatNavigationLinkProps {
   label: string;
@@ -46,10 +51,26 @@ function ChatNavigationLink({
 }
 
 export function Header() {
+  const profileReady = useSyncExternalStore(subscribeHydration, clientReady, serverReady);
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { openFeedback } = useFeedback();
   const { copy, locale } = useLanguage();
   const pathname = usePathname();
+  const profileReturnFocus = useRef<HTMLElement | null>(null);
+  function closeProfile() {
+    setIsProfileOpen(false);
+    requestAnimationFrame(() => profileReturnFocus.current?.focus({ preventScroll: true }));
+  }
+  function openProfile(event: { currentTarget: HTMLButtonElement }) {
+    setIsOpen(false);
+    if (pathname === "/profile") {
+      document.getElementById("profile-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    profileReturnFocus.current = event.currentTarget;
+    setIsProfileOpen(true);
+  }
   const navigation = [
     { label: copy.navigation.model, href: "/model" },
     { label: copy.support.nav, href: "/support" },
@@ -84,7 +105,10 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-2 xl:flex">
-          <LanguageSwitcher />
+          <button type="button" data-profile-trigger disabled={!profileReady} aria-label={profileLabels[locale]} aria-haspopup={pathname === "/profile" ? undefined : "dialog"} aria-current={pathname === "/profile" ? "page" : undefined} onClick={openProfile}
+            className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[13px] border border-[var(--region-border,#d7d8d3)] bg-white/70 px-4 text-sm font-semibold">
+            <UserRound size={17} aria-hidden="true" />{profileLabels[locale]}
+          </button>
           <button
             type="button"
             onClick={() => openFeedback({ source: "header" })}
@@ -103,6 +127,10 @@ export function Header() {
               compact
             />
           ) : null}
+          <button type="button" data-profile-trigger disabled={!profileReady} aria-label={profileLabels[locale]} aria-haspopup={pathname === "/profile" ? undefined : "dialog"} aria-current={pathname === "/profile" ? "page" : undefined} onClick={openProfile}
+            className="focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--region-border,#d7d8d3)] bg-white/70">
+            <UserRound size={18} aria-hidden="true" />
+          </button>
           <button
             type="button"
             className="header-menu focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#d7d8d3] bg-[#fbfaf6] text-ink xl:hidden"
@@ -150,12 +178,6 @@ export function Header() {
               ))}
             </ul>
             <div className="mt-2 border-t border-[#e3dfd7] px-3 pt-3">
-              <LanguageSwitcher compact />
-            </div>
-            <div className="mt-2 border-t border-[#e3dfd7] px-3 pt-3">
-              <TextSizeControl />
-            </div>
-            <div className="mt-2 border-t border-[#e3dfd7] px-3 pt-3">
               <button
                 type="button"
                 onClick={() => {
@@ -170,6 +192,7 @@ export function Header() {
           </motion.nav>
         ) : null}
       </AnimatePresence>
+      {isProfileOpen ? <ProfileDialog onClose={closeProfile} /> : null}
     </header>
   );
 }

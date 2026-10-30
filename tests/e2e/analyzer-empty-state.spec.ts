@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { analysisFixture } from "./helpers/analysis";
-import { changeLanguage, type Locale } from "./helpers/language";
+import { changeLanguage, openProfile, type Locale } from "./helpers/language";
 
 const headings: Record<Locale, string> = {
   uz: "Tahlil natijasi",
@@ -89,10 +89,10 @@ test("typing only fills a draft; a submitted result clears and restores from opt
   const input = page.locator("#analysis-text");
   const clear = page.getByRole("button", { name: "Очистить текст", exact: true });
   await expect(clear).toBeDisabled();
-  await page.locator("#analysis-history-trigger").click();
-  const history = page.getByRole("dialog", { name: "История проверок", exact: true });
-  await history.getByRole("button", { name: "Включить локальную историю", exact: true }).click();
-  await history.getByRole("button", { name: "Закрыть историю", exact: true }).click();
+  const history = await openProfile(page);
+  await history.getByTestId("profile-history-enabled").check();
+  await page.keyboard.press("Escape");
+  await expect(history).not.toBeVisible();
 
   const submittedText = "По данным Росстата, новый городской парк открылся после реконструкции.";
   await input.fill(submittedText);
@@ -124,9 +124,9 @@ test("typing only fills a draft; a submitted result clears and restores from opt
   await expect(clear).toBeDisabled();
   expect(requests).toHaveLength(1);
 
-  await page.locator("#analysis-history-trigger").click();
-  await expect(history.getByRole("listitem")).toHaveCount(1);
-  await history.getByRole("button", { name: "Открыть", exact: true }).click();
+  await openProfile(page);
+  await expect(history.getByTestId("profile-history-item")).toHaveCount(1);
+  await history.getByRole("button", { name: "Открыть текст", exact: true }).click();
   await expect(history).not.toBeVisible();
   await expect(input).toHaveValue(submittedText);
   await expect(verdict).toBeVisible();
@@ -177,14 +177,15 @@ test("failed first checks do not manufacture a verdict and clearing returns to e
   await expectEmptyResult(page, "ru");
 });
 
-test("localized footer Telegram link has safe attributes, a phone-size target and opens the intended bot", async ({ page, context }) => {
+test("localized profile Telegram link has safe attributes, a phone-size target and opens the intended bot", async ({ page, context }) => {
   // Intercept the destination so this checks navigation without contacting Telegram.
   await context.route("https://t.me/RuFact_bot", route => route.fulfill({
     contentType: "text/html",
     body: "<!doctype html><title>RuFact Telegram bot test destination</title><h1>@RuFact_bot</h1>",
   }));
   await page.goto("/");
-  const link = page.locator('.site-footer a[href="https://t.me/RuFact_bot"]');
+  const profile = await openProfile(page);
+  const link = profile.locator('a[href="https://t.me/RuFact_bot"]');
   const accessibleNames: string[] = [];
   for (const locale of ["uz", "ru", "en"] as const) {
     await changeLanguage(page, locale);
