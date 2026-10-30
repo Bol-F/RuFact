@@ -14,6 +14,7 @@ import { deriveClaimLabel, MAX_CORRECTION_LENGTH, readClaimEvidence, safeSourceH
 import { claimsCoverShortText, isSingleShortStatement, restoreClaimQuote } from "./claim-text.ts";
 import { arithmeticExplanation, evaluateArithmeticClaim, type ArithmeticClaimResult } from "./arithmetic.ts";
 import type { AppLocale } from "./i18n";
+import { isSearchTopic } from "./search-topics.ts";
 
 export type { GeminiReview } from "@/lib/gemini-review";
 
@@ -854,6 +855,10 @@ export async function analyzeText(
     throw new Error("Текст не должен превышать 5000 символов.");
   }
 
+  if (options.topic !== undefined && !isSearchTopic(options.topic)) {
+    throw new Error("Invalid search topic.");
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -865,6 +870,7 @@ export async function analyzeText(
         text: normalizedText,
         useGemini: options.useGemini === true,
         locale: options.locale ?? "uz",
+        ...(options.topic && options.topic !== "general" ? { topic: options.topic } : {}),
       }),
       cache: "no-store",
       signal: controller.signal,

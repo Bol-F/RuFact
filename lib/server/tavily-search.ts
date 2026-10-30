@@ -3,6 +3,8 @@ import { createAbortScope } from "./abort-scope.ts";
 import { readBoundedText } from "./bounded-text.ts";
 import type { AppLocale } from "../i18n";
 import { safeSourceHref } from "../claim-evidence.ts";
+import type { SearchTopic } from "../search-topics";
+import { preferredTopicDomains } from "./search-topic-policy.ts";
 
 const TAVILY_SEARCH_ENDPOINT = "https://api.tavily.com/search";
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -45,6 +47,7 @@ export interface TavilyRequest {
   signal?: AbortSignal;
   // Server-owned ranking hints; prefer keeps the wider web searchable.
   preferredDomains?: readonly string[];
+  topic?: SearchTopic;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -110,8 +113,10 @@ export async function requestTavilyEvidence({
   fetchImpl = fetch,
   signal,
   preferredDomains,
+  topic = "general",
 }: TavilyRequest): Promise<TavilySearchResult> {
   const abortScope = createAbortScope(signal, timeoutMs);
+  const domains = preferredTopicDomains(topic, preferredDomains);
 
   try {
     const response = await fetchImpl(TAVILY_SEARCH_ENDPOINT, {
@@ -128,8 +133,8 @@ export async function requestTavilyEvidence({
         topic: "general",
         language: locale,
         filter_by_language: false,
-        ...(preferredDomains?.length ? {
-          include_domains: preferredDomains,
+        ...(domains.length ? {
+          include_domains: domains,
           include_domains_mode: "prefer",
         } : {}),
         include_answer: false,

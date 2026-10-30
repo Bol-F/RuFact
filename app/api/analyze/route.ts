@@ -19,6 +19,7 @@ import { isAppLocale, type AppLocale } from "@/lib/i18n";
 import type { TextLanguage } from "@/lib/text-language";
 import { resolveAnalysis } from "@/lib/server/analysis-routing";
 import { BodyTooLargeError, readBoundedText } from "@/lib/server/bounded-text";
+import { isSearchTopic, type SearchTopic } from "@/lib/search-topics";
 
 const MAX_TEXT_LENGTH = 5_000;
 const MAX_BODY_BYTES = 24_000;
@@ -168,16 +169,17 @@ async function getRateLimitedGeminiAssessment(
   text: string,
   locale: AppLocale,
   inputLanguage: TextLanguage,
+  topic: SearchTopic,
 ) {
   if (!isGeminiReviewConfigured()) {
-    return getGeminiAssessment(text, locale, request.signal, inputLanguage);
+    return getGeminiAssessment(text, locale, request.signal, inputLanguage, topic);
   }
 
   const sourceLimit = await rateLimitInternetRequest(request);
   if (!sourceLimit.configured) return unavailable("search-error");
   if (!sourceLimit.allowed) return unavailable("search-rate-limited");
 
-  return getGeminiAssessment(text, locale, request.signal, inputLanguage);
+  return getGeminiAssessment(text, locale, request.signal, inputLanguage, topic);
 }
 
 export async function POST(request: Request) {
@@ -238,13 +240,18 @@ export async function POST(request: Request) {
     return jsonResponse({ error: "Добавьте поле text в запрос." }, 400);
   }
 
-  const { text, useGemini, locale: requestedLocale } = body as {
+  const { text, useGemini, locale: requestedLocale, topic: requestedTopic } = body as {
     text?: unknown;
     useGemini?: unknown;
     locale?: unknown;
+    topic?: unknown;
   };
 
   const locale: AppLocale = isAppLocale(requestedLocale) ? requestedLocale : "uz";
+  if (requestedTopic !== undefined && !isSearchTopic(requestedTopic)) {
+    return jsonResponse({ error: "Invalid search topic." }, 400);
+  }
+  const topic: SearchTopic = requestedTopic ?? "general";
 
   if (
     typeof useGemini !== "undefined" &&
@@ -272,12 +279,12 @@ export async function POST(request: Request) {
   const mlEndpoint = process.env.ML_API_URL?.trim();
 
   return jsonResponse(await resolveAnalysis({
-    text: normalizedText, locale, mlConfigured: Boolean(mlEndpoint),
+    text: normalizedText, locale, topic, mlConfigured: Boolean(mlEndpoint),
     useGemini: typeof useGemini === "boolean" ? useGemini : undefined,
   }, {
     requestMl: text => mlEndpoint ? requestMlPrediction(mlEndpoint, text, request.signal)
       : Promise.resolve({ ok: false as const }),
-    getAssessment: (text, outputLocale, inputLanguage) =>
-      getRateLimitedGeminiAssessment(request, text, outputLocale, inputLanguage),
+    getAssessment: (text, outputLocale, inputLanguage, topic = "general") =>
+      getRateLimitedGeminiAssessment(request, text, outputLocale, inputLanguage, topic),
   }));
 }

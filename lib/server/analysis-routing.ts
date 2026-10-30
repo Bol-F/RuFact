@@ -3,18 +3,20 @@ import { getCalculationAnalysis } from "../api.ts";
 import type { AppLocale } from "../i18n";
 import { detectTextLanguage, type TextLanguage } from "../text-language.ts";
 import type { GeminiAssessment } from "./gemini-review-core";
+import type { SearchTopic } from "../search-topics";
 
 interface AnalysisRoutingInput {
   text: string;
   locale: AppLocale;
   useGemini?: boolean;
   mlConfigured: boolean;
+  topic?: SearchTopic;
 }
 
 interface AnalysisRoutingDependencies {
   requestMl: (text: string) => Promise<{ ok: true; payload: AnalysisResponse } | { ok: false }>;
   // Production supplies the rate-limited, server-authenticated wrapper, not raw provider fetches.
-  getAssessment: (text: string, locale: AppLocale, inputLanguage: TextLanguage) => Promise<GeminiAssessment>;
+  getAssessment: (text: string, locale: AppLocale, inputLanguage: TextLanguage, topic?: SearchTopic) => Promise<GeminiAssessment>;
 }
 
 /** Orchestrate after HTTP validation/rate limiting. Uzbek never consumes ML capacity or needs its JWT. */
@@ -34,7 +36,7 @@ export async function resolveAnalysis(
   const [mlResult, assessment] = await Promise.all([
     canRunMl ? dependencies.requestMl(input.text).catch(() => ({ ok: false as const }))
       : Promise.resolve({ ok: false as const }),
-    needsSources ? dependencies.getAssessment(input.text, input.locale, inputLanguage).catch(() => ({
+    needsSources ? dependencies.getAssessment(input.text, input.locale, inputLanguage, input.topic ?? "general").catch(() => ({
       status: "unavailable" as const, provider: "gemini" as const, reason: "upstream-error" as const,
     })) : Promise.resolve(null),
   ]);

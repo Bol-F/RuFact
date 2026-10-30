@@ -5,6 +5,7 @@ import { getAiChatReply } from "@/lib/server/ai-chat";
 import { rateLimitAnalysisRequest, rateLimitInternetRequest, rateLimitHeaders } from "@/lib/server/rate-limit";
 import { isGeminiReviewConfigured } from "@/lib/server/gemini-review";
 import { localChatReply } from "@/lib/chat-local";
+import { isSearchTopic } from "@/lib/search-topics";
 
 export const runtime = "nodejs";
 export const maxDuration = 40;
@@ -42,12 +43,13 @@ export async function POST(request: Request) {
   const payload = body as Record<string, unknown>;
   const messages = parseChatMessages(payload.messages);
   if (!messages || !isAppLocale(payload.locale)) return json({ error: "Invalid conversation or language" }, 400);
+  if (payload.topic !== undefined && !isSearchTopic(payload.topic)) return json({ error: "Invalid search topic" }, 400);
   const local = localChatReply(messages, payload.locale);
   if (local) return json(local);
   if (!isGeminiReviewConfigured()) return json({ status: "unavailable", reason: "not-configured" }, 503);
   const budget = await rateLimitInternetRequest(request);
   if (!budget.configured) return json({ error: "Protection unavailable" }, 503);
   if (!budget.allowed) return json({ status: "unavailable", reason: "limited" }, 429, { "Retry-After": String(Math.max(1, Math.ceil((budget.reset - Date.now()) / 1000))) });
-  const reply = await getAiChatReply(messages, payload.locale, request.signal);
+  const reply = await getAiChatReply(messages, payload.locale, request.signal, payload.topic ?? "general");
   return json(reply, reply.status === "complete" ? 200 : 503);
 }

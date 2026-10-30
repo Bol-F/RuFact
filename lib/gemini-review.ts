@@ -1,4 +1,5 @@
 import type { AppLocale } from "./i18n";
+import type { SearchTopic } from "./search-topics";
 
 export type GeminiReviewLabel = "REAL" | "FAKE" | "UNSURE";
 export type GeminiReviewCertainty = "low" | "medium" | "high";
@@ -78,6 +79,7 @@ export interface GeminiReviewUnavailable {
 export type GeminiReview = GeminiReviewComplete | GeminiReviewUnavailable;
 
 export interface GeminiReviewRequestOptions {
+  topic?: SearchTopic;
   useGemini?: boolean;
   locale?: AppLocale;
 }
